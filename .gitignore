@@ -1,0 +1,27 @@
+# Android Studio
+.idea/
+*.iml
+local.properties
+
+# Android build
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Kotlin / Java
+*.class
+*.jar
+*.aar
+
+# Rust
+core/target/
+core/vaults-core/target/
+core/vaults-cli/target/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

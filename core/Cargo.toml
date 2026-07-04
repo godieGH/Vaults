@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "vaults-core",
+    "vaults-cli"
+]
+resolver = "3"
