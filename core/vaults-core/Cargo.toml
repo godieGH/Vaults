@@ -13,3 +13,4 @@ sha2 = "0.10"
 hkdf = "0.12"
 rand = "0.8"
 hex = "0.4"
+totp-rs = { version = "5", features = ["gen_secret"] }
