@@ -1,5 +1,14 @@
 // src/lib.rs
 
+uniffi::include_scaffolding!("vaults");
+
+pub mod ffi;
+pub use ffi::ffi_generate_salt;
+pub use ffi::ffi_derive_master_key;
+pub use ffi::ffi_derive_pin;
+pub use ffi::ffi_generate_totp_secret;
+pub use ffi::ffi_verify_totp;
+
 use rand::RngCore;
 use rand::rngs::OsRng;
 use pbkdf2::pbkdf2_hmac;

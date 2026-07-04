@@ -1,0 +1,7 @@
+namespace vaults {
+    bytes ffi_generate_salt();
+    bytes ffi_derive_master_key(string passphrase, bytes salt);
+    string ffi_derive_pin(bytes master_key, string context, u32 pin_length);
+    string ffi_generate_totp_secret();
+    boolean ffi_verify_totp(string secret, string code);
+};
