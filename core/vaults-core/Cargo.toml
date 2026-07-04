@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["rlib", "cdylib"]
 
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
 [dependencies]
 pbkdf2 = { version = "0.12", features = ["hmac"] }
 hmac = "0.12"
@@ -14,7 +18,7 @@ hkdf = "0.12"
 rand = "0.8"
 hex = "0.4"
 totp-rs = { version = "5", features = ["gen_secret"] }
-uniffi = { version = "0.28", features = ["build"] }
+uniffi = { version = "0.27", features = ["build", "cli"] }
 
 [build-dependencies]
-uniffi = { version = "0.28", features = ["build"] }
+uniffi = { version = "0.27", features = ["build", "cli"] }
