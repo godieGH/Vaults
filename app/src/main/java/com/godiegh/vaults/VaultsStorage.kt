@@ -54,7 +54,10 @@ object VaultsStorage {
             obj.put("countryCode", s.countryCode)
             obj.put("identifier", s.identifier)
             obj.put("pinLength", s.pinLength)
+            obj.put("rotation", s.rotation)
             array.put(obj)
+            obj.put("displayName", s.displayName)
+            obj.put("category", s.category)
         }
         getPrefs(context).edit { putString(KEY_SERVICES, array.toString()) }
     }
@@ -69,7 +72,10 @@ object VaultsStorage {
                 name = obj.getString("name"),
                 countryCode = obj.getString("countryCode"),
                 identifier = obj.getString("identifier"),
-                pinLength = obj.getInt("pinLength")
+                pinLength = obj.getInt("pinLength"),
+                rotation = obj.optInt("rotation", 1), // old entries saved before this feature existed
+                displayName = obj.optString("displayName", obj.getString("name").replaceFirstChar { it.uppercase() }),
+                category = obj.optString("category", "MOBILE_MONEY")
             )
         }
     }
@@ -129,5 +135,18 @@ object VaultsStorage {
 
     fun clearAll(context: Context) {
         getPrefs(context).edit { clear() }
+    }
+
+
+    private const val KEY_VIEW_MODE = "view_mode"
+    const val VIEW_MODE_LIST = 0
+    const val VIEW_MODE_GRID = 1
+
+    fun saveViewMode(context: Context, mode: Int) {
+        getPrefs(context).edit { putInt(KEY_VIEW_MODE, mode) }
+    }
+
+    fun loadViewMode(context: Context): Int {
+        return getPrefs(context).getInt(KEY_VIEW_MODE, VIEW_MODE_LIST)
     }
 }

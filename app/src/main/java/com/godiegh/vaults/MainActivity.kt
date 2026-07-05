@@ -3,6 +3,7 @@ package com.godiegh.vaults
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -25,12 +26,35 @@ import uniffi.vaults.ffiGenerateSalt
 import uniffi.vaults.ffiGenerateTotpSecret
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Password
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
+
         enableEdgeToEdge()
 
         ThemeState.mode.value = VaultsStorage.loadThemeMode(this)
@@ -77,25 +101,34 @@ class MainActivity : FragmentActivity() {
                     }
 
                     // 5. Secure Reveal Screen (Accepts the configuration components as route arguments)
-                    composable(
-                        route = "reveal_pin/{country}/{name}/{identifier}/{pinLength}"
-                    ) { backStackEntry ->
-                        // Extract parameters safely from navigation arguments
+                    composable(route = "reveal_pin/{id}/{country}/{name}/{identifier}/{pinLength}/{rotation}") { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("id") ?: ""
                         val country = backStackEntry.arguments?.getString("country") ?: "tz"
                         val name = backStackEntry.arguments?.getString("name") ?: ""
                         val identifier = backStackEntry.arguments?.getString("identifier") ?: ""
                         val pinLength = backStackEntry.arguments?.getString("pinLength")?.toIntOrNull() ?: 4
+                        val rotation = backStackEntry.arguments?.getString("rotation")?.toIntOrNull() ?: 1
 
-                        // Reconstruct temporary item context object for the Reveal UI layer
                         val selectedService = ServiceConfig(
-                            id = "",
-                            name = name,
-                            countryCode = country,
-                            identifier = identifier,
-                            pinLength = pinLength
+                            id = id, name = name, countryCode = country,
+                            identifier = identifier, pinLength = pinLength, rotation = rotation
                         )
-
                         RevealPinScreen(service = selectedService, navController = navController)
+                    }
+
+                    composable(route = "rotate_pin/{id}/{country}/{name}/{identifier}/{pinLength}/{rotation}") { backStackEntry ->
+                        val id = backStackEntry.arguments?.getString("id") ?: ""
+                        val country = backStackEntry.arguments?.getString("country") ?: "tz"
+                        val name = backStackEntry.arguments?.getString("name") ?: ""
+                        val identifier = backStackEntry.arguments?.getString("identifier") ?: ""
+                        val pinLength = backStackEntry.arguments?.getString("pinLength")?.toIntOrNull() ?: 4
+                        val rotation = backStackEntry.arguments?.getString("rotation")?.toIntOrNull() ?: 1
+
+                        val selectedService = ServiceConfig(
+                            id = id, name = name, countryCode = country,
+                            identifier = identifier, pinLength = pinLength, rotation = rotation
+                        )
+                        RotatePinScreen(service = selectedService, navController = navController)
                     }
                 }
 
@@ -104,195 +137,336 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(navController: NavController, modifier: Modifier) {
     val context = LocalContext.current
 
-    // Define the overview pages mapped to your actual application goals
     val overviewPages = listOf(
-        Pair(
+        Triple(
+            Icons.Default.Password,
             "Never Memorize a PIN Again",
-            "Manage distinct PINs for your mobile money accounts (M-Pesa, Tigo Pesa, Airtel Money) or your bank ATM cards or even Banking apps (like CRDB SimBanking, NMB Mklik, NBC Kiganjani) or a mobile money wallet effortlessly without reusing them or storing them anywhere."
+            "Manage distinct PINs for your mobile money accounts (M-Pesa, Tigo Pesa, Airtel Money), bank ATM cards, or banking apps (CRDB SimBanking, NMB Mkonjani, NBC Kiganjani) — effortlessly, without reusing them or storing them anywhere."
         ),
-        Pair(
+        Triple(
+            Icons.Default.CloudOff,
             "Purely Derived, Zero Storage",
-            "Vaults does not save your PINs. Instead, it securely computes them on the fly using your master passphrase combined with a unique cryptographic salt."
+            "Vaults never saves your PINs. It securely computes them on the fly using your master passphrase combined with a unique cryptographic salt."
         ),
-        Pair(
+        Triple(
+            Icons.Default.Shield,
             "Two-Factor Security",
-            "With integrated TOTP tokens and biometric authentication, your local generation keys remain safe even if your phone changes hands."
+            "With integrated TOTP tokens and biometric authentication, your local generation keys stay safe even if your phone changes hands."
         )
     )
 
-    // Total pages = Overview items + 1 final page for creating the passphrase
     val totalPages = overviewPages.size + 1
     val pagerState = rememberPagerState(pageCount = { totalPages })
     val coroutineScope = rememberCoroutineScope()
+    val tooltipState = rememberTooltipState(isPersistent = true)
 
-    // Passphrase state variables (Moved from original code)
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var passphraseVisible by remember { mutableStateOf(false) }
     var confirmVisible by remember { mutableStateOf(false) }
 
+    fun strength(pass: String): Float {
+        var score = 0
+        if (pass.length >= 8) score++
+        if (pass.length >= 12) score++
+        if (pass.any { it.isDigit() }) score++
+        if (pass.any { !it.isLetterOrDigit() }) score++
+        if (pass.any { it.isUpperCase() } && pass.any { it.isLowerCase() }) score++
+        return score / 5f
+    }
+
+    val onLastPage = pagerState.currentPage == totalPages - 1
+    val canProceed = !onLastPage || (passphrase.length >= 8 && passphrase == confirm)
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        Column(
-            modifier = modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                // Only show the skip button if we aren't on the final passphrase page yet
-                if (pagerState.currentPage < totalPages - 1) {
-                    TextButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                // Instantly snap to the final passphrase screen
-                                pagerState.scrollToPage(totalPages - 1)
-                            }
-                        }
-                    ) {
-                        Text("Skip", color = MaterialTheme.colorScheme.primary)
-                    }
-                } else {
-                    // Keeps the spacing consistent when the button disappears
-                    Spacer(modifier = Modifier.height(48.dp))
-                }
-            }
-
-            // 2. The Swipable Container
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f), // Take up available space
-                userScrollEnabled = true
-            ) { pageIndex ->
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (pageIndex < overviewPages.size) {
-                        // --- OVERVIEW PAGES ---
-                        val (title, description) = overviewPages[pageIndex]
-
-                        Text(title, style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    } else {
-                        // --- FINAL STEP: PASSPHRASE CREATION ---
-                        Text("Secure Your Vault", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Create a master passphrase. This is the only thing you need to remember.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        OutlinedTextField(
-                            value = passphrase,
-                            onValueChange = { passphrase = it },
-                            label = { Text("Master passphrase") },
-                            visualTransformation = if (passphraseVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                val image =
-                                    if (passphraseVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                                val description =
-                                    if (passphraseVisible) "Hide passphrase" else "Show passphrase"
-
-                                IconButton(onClick = { passphraseVisible = !passphraseVisible }) {
-                                    Icon(imageVector = image, contentDescription = description)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = confirm,
-                            onValueChange = { confirm = it },
-                            label = { Text("Confirm passphrase") },
-                            visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                val image =
-                                    if (confirmVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                                val description =
-                                    if (confirmVisible) "Hide passphrase" else "Show passphrase"
-
-                                IconButton(onClick = { confirmVisible = !confirmVisible }) {
-                                    Icon(imageVector = image, contentDescription = description)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        if (error.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(error, color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                }
-            }
-
-            // 3. Simple Page Indicators (Dots) at the bottom
-            Row(
-                Modifier.wrapContentHeight().fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                repeat(totalPages) { iteration ->
-                    val color =
-                        if (pagerState.currentPage == iteration) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-                    Box(
-                        modifier = Modifier
-                            .padding(4.dp)
-                            .size(8.dp).background(
-                                color,
-                                shape = androidx.compose.foundation.shape.CircleShape
-                            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            MaterialTheme.colorScheme.background
+                        ),
+                        endY = 900f
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 4. Dynamic Action Button
-            Button(
-                onClick = {
-                    if (pagerState.currentPage < totalPages - 1) {
-                        // If on overview screens, just advance to the next page
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                )
+        ) {
+            Column(
+                modifier = modifier.fillMaxSize().padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // --- TOP BAR: Skip (overview) or Info tooltip (final page) ---
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    if (!onLastPage) {
+                        TextButton(
+                            onClick = { coroutineScope.launch { pagerState.scrollToPage(totalPages - 1) } }
+                        ) {
+                            Text("Skip", color = MaterialTheme.colorScheme.primary)
                         }
                     } else {
-                        // If on the final passphrase screen, execute your original validation & navigation logic
-                        if (passphrase.length < 8) {
-                            error = "Passphrase must be at least 8 characters"
-                        } else if (passphrase != confirm) {
-                            error = "Passphrases do not match"
-                        } else {
-                            val salt = ffiGenerateSalt()
-                            val totpSecret = ffiGenerateTotpSecret()
-                            VaultsStorage.saveSalt(context, salt)
-                            VaultsStorage.saveTotpSecret(context, totpSecret)
-                            navController.navigate("2fa_setup/$passphrase") {
-                                popUpTo("onboarding") { inclusive = true }
+                        var showInfo by remember { mutableStateOf(false) }
+
+                        Box {
+                            IconButton(onClick = { showInfo = !showInfo }) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Why can't I change this later?",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            val density = LocalDensity.current
+
+                            if (showInfo) {
+                                Popup(
+                                    alignment = Alignment.TopEnd,
+                                    offset = with(density) { IntOffset(-40, 44.dp.roundToPx()) }, // matches IconButton's default 48dp touch target minus tiny overlap
+                                    onDismissRequest = { showInfo = false }
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(topEnd = 0.dp, topStart = 12.dp, bottomStart = 12.dp, bottomEnd = 12.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        tonalElevation = 3.dp,
+                                        modifier = Modifier.widthIn(min = 240.dp, max = 300.dp)
+                                    ) {
+                                        Text(
+                                            "Unlike a login password, this can't be changed later without starting over — it's the key that generates all your future PINs.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Text toggles depending on what page the user is currently looking at
-                Text(if (pagerState.currentPage < totalPages - 1) "Next" else "Create Vault")
+                }
+
+                // --- PAGER ---
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f),
+                    userScrollEnabled = true
+                ) { pageIndex ->
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (pageIndex < overviewPages.size) {
+                            val (icon, title, description) = overviewPages[pageIndex]
+
+                            Box(
+                                modifier = Modifier
+                                    .size(104.dp)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.tertiary
+                                            )
+                                        ),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(46.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Text(
+                                title,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                        } else {
+                            // --- FINAL STEP: PASSPHRASE CREATION ---
+                            Box(
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Text(
+                                "Secure Your Vault",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Create a master passphrase. This is the only thing you need to remember.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(28.dp))
+
+                            OutlinedTextField(
+                                value = passphrase,
+                                onValueChange = { passphrase = it; error = "" },
+                                label = { Text("Master passphrase") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                visualTransformation = if (passphraseVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { passphraseVisible = !passphraseVisible }) {
+                                        Icon(
+                                            imageVector = if (passphraseVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                            contentDescription = if (passphraseVisible) "Hide passphrase" else "Show passphrase"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            if (passphrase.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val s = strength(passphrase)
+                                LinearProgressIndicator(
+                                    progress = { s },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(5.dp)
+                                        .clip(RoundedCornerShape(50)),
+                                    color = when {
+                                        s < 0.4f -> MaterialTheme.colorScheme.error
+                                        s < 0.7f -> Color(0xFFF9A825)
+                                        else -> Color(0xFF2E7D32)
+                                    },
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            OutlinedTextField(
+                                value = confirm,
+                                onValueChange = { confirm = it; error = "" },
+                                label = { Text("Confirm passphrase") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    if (confirm.isNotEmpty()) {
+                                        Icon(
+                                            imageVector = if (confirm == passphrase) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                                            contentDescription = null,
+                                            tint = if (confirm == passphrase) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                                        )
+                                    } else {
+                                        IconButton(onClick = { confirmVisible = !confirmVisible }) {
+                                            Icon(
+                                                imageVector = if (confirmVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                                contentDescription = if (confirmVisible) "Hide passphrase" else "Show passphrase"
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            if (error.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+
+                // --- DOT INDICATORS ---
+                Row(
+                    Modifier.wrapContentHeight().fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    repeat(totalPages) { iteration ->
+                        val active = pagerState.currentPage == iteration
+                        val width by animateDpAsState(if (active) 24.dp else 8.dp, label = "dotWidth")
+                        Box(
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .height(8.dp)
+                                .width(width)
+                                .background(
+                                    if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // --- ACTION BUTTON ---
+                Button(
+                    onClick = {
+                        if (!onLastPage) {
+                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        } else {
+                            if (passphrase.length < 8) {
+                                error = "Passphrase must be at least 8 characters"
+                            } else if (passphrase != confirm) {
+                                error = "Passphrases do not match"
+                            } else {
+                                val salt = ffiGenerateSalt()
+                                val totpSecret = ffiGenerateTotpSecret()
+                                VaultsStorage.saveSalt(context, salt)
+                                VaultsStorage.saveTotpSecret(context, totpSecret)
+                                navController.navigate("2fa_setup/$passphrase") {
+                                    popUpTo("onboarding") { inclusive = true }
+                                }
+                            }
+                        }
+                    },
+                    enabled = canProceed,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    contentPadding = PaddingValues()
+                ) {
+                    if (!onLastPage) {
+                        Text("Next", style = MaterialTheme.typography.titleMedium)
+                    } else {
+                        Text("Create Vault", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

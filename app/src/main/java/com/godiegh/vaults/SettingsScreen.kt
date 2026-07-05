@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -174,11 +175,6 @@ fun SettingsScreen(navController: NavController) {
             item { SettingsSectionHeader("Security") }
 
             item {
-                SettingsStubRow(label = "Change Master Passphrase") {
-                    /* TODO: wire once passphrase-change flow exists */
-                }
-            }
-            item {
                 SettingsStubRow(label = "Change 2FA Method") {
                     /* TODO: navigate back into 2fa_setup flow */
                 }
@@ -189,13 +185,41 @@ fun SettingsScreen(navController: NavController) {
                 }
             }
 
+            item {
+                Card(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info, // Requires androidx.compose.material.icons.Icons
+                            contentDescription = "Info",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = 12.dp)
+                        )
+                        Text(
+                            text = "Your passphrase can't be changed on its own — it's the actual\n" + "key that generates all your PINs, not a password we check\n" + "against. Changing it would produce entirely different PINs\n" + "that no longer match what's set at your bank or mobile money\n" + "provider.\n" + "\n" + "Resetting starts fresh: new passphrase, new salt, and you'll\n" + "need to re-register new PINs with each service afterward.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             item { Spacer(modifier = Modifier.height(16.dp)) }
             item { HorizontalDivider() }
             item { SettingsSectionHeader("Data") }
 
             item {
                 SettingsStubRow(
-                    label = "Clear All Data",
+                    label = "Reset Vaults",
                     labelColor = MaterialTheme.colorScheme.error
                 ) {
                     showClearDataDialog = true
