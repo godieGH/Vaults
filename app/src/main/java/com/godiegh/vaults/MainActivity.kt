@@ -36,7 +36,9 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = navController, startDestination = startDestination) {
                     composable("onboarding") {
-                        OnboardingScreen(navController)
+                        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                            OnboardingScreen(navController, modifier = Modifier.padding(innerPadding))
+                        }
                     }
                     composable("main") {
                         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -60,15 +62,16 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun OnboardingScreen(navController: NavController) {
+fun OnboardingScreen(navController: NavController, modifier: Modifier) {
     val context = LocalContext.current
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var passphraseVisible by remember { mutableStateOf(false) }
+    var confirmVisible by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -97,7 +100,15 @@ fun OnboardingScreen(navController: NavController) {
             value = confirm,
             onValueChange = { confirm = it },
             label = { Text("Confirm passphrase") },
-            visualTransformation = if (passphraseVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                val image = if (confirmVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                val description = if (confirmVisible) "Hide passphrase" else "Show passphrase"
+
+                IconButton(onClick = { confirmVisible = !confirmVisible }) {
+                    Icon(imageVector = image, contentDescription = description)
+                }
+            },
             modifier = Modifier.fillMaxWidth()
         )
 
