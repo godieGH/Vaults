@@ -17,3 +17,10 @@ val VaultTextSecondary = Color(0xFFB8C1CC)
 // Status
 val VaultError = Color(0xFFE53935)
 val VaultSuccess = Color(0xFF22C55E)
+
+val VaultBackgroundLight = Color(0xFFFFFFFF)
+
+// Additional accent presets
+val VaultRoseGold = Color(0xFFB76E79)
+val VaultPlatinum = Color(0xFFC7CDD6)
+val VaultEmerald = Color(0xFF22C55E) // same as VaultSuccess, reused as an accent
