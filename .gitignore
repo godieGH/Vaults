@@ -1,6 +1,8 @@
 # Android Studio
 .idea/
 *.iml
+hs_err_pid*.log
+replay_pid*.log
 local.properties
 
 # Android build
@@ -26,5 +28,6 @@ core/vaults-cli/target/
 Thumbs.db
 desktop.ini
 
+# secure core salt and totp keys
 vaults.salt
 vaults.totp

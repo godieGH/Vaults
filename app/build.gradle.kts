@@ -59,6 +59,14 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.circular.progressbar)
+    implementation(libs.jna) { artifact { type = "aar" } }
+    implementation(libs.kotlinx.coroutines.android)
+    implementation("androidx.security:security-crypto:1.1.0")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.biometric:biometric:1.1.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -66,7 +74,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation(libs.jna) { artifact { type = "aar" } }
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.circular.progressbar)
 }
