@@ -1,4 +1,4 @@
-use crate::{derive_master_key, derive_pin, generate_salt, generate_totp_secret, verify_totp};
+use crate::{derive_master_key, derive_pin, generate_salt, generate_totp_secret, verify_totp, derive_passphrase_fingerprint};
 
 pub fn ffi_generate_salt() -> Vec<u8> {
     generate_salt().to_vec()
@@ -18,4 +18,8 @@ pub fn ffi_generate_totp_secret() -> String {
 
 pub fn ffi_verify_totp(secret: String, code: String) -> bool {
     verify_totp(&secret, &code)
+}
+
+pub fn ffi_derive_passphrase_fingerprint(passphrase: String, salt: Vec<u8>) -> String {
+    derive_passphrase_fingerprint(&passphrase, &salt)
 }

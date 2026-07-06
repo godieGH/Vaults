@@ -4,4 +4,5 @@ namespace vaults {
     string ffi_derive_pin(bytes master_key, string context, u32 pin_length);
     string ffi_generate_totp_secret();
     boolean ffi_verify_totp(string secret, string code);
+    string ffi_derive_passphrase_fingerprint(string passphrase, bytes salt);
 };

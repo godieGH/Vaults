@@ -10,6 +10,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.fragment.app.FragmentActivity
 import com.godiegh.vaults.VaultsStorage.TIER_BIOMETRIC
 import com.godiegh.vaults.VaultsStorage.TIER_PASSPHRASE_ONLY
 import com.godiegh.vaults.VaultsStorage.TIER_TOTP_BIOMETRIC
@@ -109,8 +112,6 @@ fun RevealPinScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     if (tier == TIER_BIOMETRIC || tier == TIER_TOTP_BIOMETRIC) {
-                        val activity = context as? androidx.fragment.app.FragmentActivity
-
                         Text(
                             "Authenticate to reveal your PIN",
                             style = MaterialTheme.typography.bodyMedium
@@ -122,6 +123,13 @@ fun RevealPinScreen(
                         }
                         Button(
                             onClick = {
+                                var act: Context? = context
+                                while (act is ContextWrapper) {
+                                    if (act is FragmentActivity) break
+                                    act = act.baseContext
+                                }
+                                val activity = act as? FragmentActivity
+
                                 if (activity == null) {
                                     errorMessage = "Unable to launch biometric prompt"
                                     return@Button
@@ -136,7 +144,7 @@ fun RevealPinScreen(
                                             val masterKey =
                                                 ffiDeriveMasterKey(storedPassphrase, storedSalt)
                                             val formattedContext =
-                                                "v1|${service.countryCode.lowercase()}|${service.name.lowercase()}|${service.identifier}|${service.pinLength}"
+                                                "v1|${service.countryCode.lowercase()}|${service.name.lowercase()}|${service.identifier}|${service.pinLength}|${service.rotation}"
                                             derivedPin = ffiDerivePin(
                                                 masterKey,
                                                 formattedContext,
@@ -171,9 +179,22 @@ fun RevealPinScreen(
                             Text(errorMessage, color = MaterialTheme.colorScheme.error)
                         }
                         Spacer(modifier = Modifier.height(16.dp))
+                        // Inside RevealPinScreen -> Button onClick (Passphrase entry block)
                         Button(
                             onClick = {
                                 val storedSalt = VaultsStorage.loadSalt(context) ?: byteArrayOf()
+                                val storedFingerprint = VaultsStorage.loadFingerprint(context)
+
+                                // NEW: Check fingerprint before deriving key
+                                val inputFingerprint = uniffi.vaults.ffiDerivePassphraseFingerprint(passphrase, storedSalt)
+
+                                if (storedFingerprint != null && inputFingerprint != storedFingerprint) {
+                                    errorMessage = "Incorrect master passphrase."
+                                    return@Button
+                                }
+
+                                // If it matches, proceed as normal
+                                errorMessage = ""
                                 val masterKey = ffiDeriveMasterKey(passphrase, storedSalt)
                                 val formattedContext = "v1|${service.countryCode.lowercase()}|${service.name.lowercase()}|${service.identifier}|${service.pinLength}|${service.rotation}"
                                 derivedPin = ffiDerivePin(

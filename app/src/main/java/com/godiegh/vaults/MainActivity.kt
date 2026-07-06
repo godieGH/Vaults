@@ -87,17 +87,23 @@ class MainActivity : FragmentActivity() {
                     }
 
                     composable(route = "2fa_setup/{passphrase}") { backStackEntry ->
-                        val passphrase = backStackEntry.arguments?.getString("passphrase") ?: ""
+                        val raw = backStackEntry.arguments?.getString("passphrase") ?: ""
+                        val passphrase = java.net.URLDecoder.decode(raw, "UTF-8")
                         TwoFactorSetupScreen(passphrase = passphrase, navController = navController)
                     }
 
+                    composable(route = "reauth_for_2fa/{passphrase}") { backStackEntry ->
+                        val raw = backStackEntry.arguments?.getString("passphrase") ?: ""
+                        val passphrase = java.net.URLDecoder.decode(raw, "UTF-8")
+                        ReAuthScreen(passphrase = passphrase, navController = navController)
+                    }
                     // 4. Add Service Link Configuration Page
                     composable(route = "add_service") {
                         AddServiceScreen(navController = navController)
                     }
 
                     composable(route = "settings") {
-                        SettingsScreen(navController = navController,)
+                        SettingsScreen(navController = navController)
                     }
 
                     // 5. Secure Reveal Screen (Accepts the configuration components as route arguments)
@@ -129,6 +135,18 @@ class MainActivity : FragmentActivity() {
                             identifier = identifier, pinLength = pinLength, rotation = rotation
                         )
                         RotatePinScreen(service = selectedService, navController = navController)
+                    }
+
+                    composable(route = "reauth_for_backup") {
+                        ReAuthForBackupScreen(navController = navController)
+                    }
+
+                    composable(route = "backup_salt") {
+                        BackupSaltScreen(navController = navController)
+                    }
+
+                    composable(route = "restore_backup") {
+                        RestoreBackupScreen(navController = navController)
                     }
                 }
 
@@ -163,7 +181,6 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
     val totalPages = overviewPages.size + 1
     val pagerState = rememberPagerState(pageCount = { totalPages })
     val coroutineScope = rememberCoroutineScope()
-    val tooltipState = rememberTooltipState(isPersistent = true)
 
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -439,16 +456,28 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
                         if (!onLastPage) {
                             coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                         } else {
+                            // Inside OnboardingScreen -> Button onClick
                             if (passphrase.length < 8) {
                                 error = "Passphrase must be at least 8 characters"
                             } else if (passphrase != confirm) {
                                 error = "Passphrases do not match"
                             } else {
-                                val salt = ffiGenerateSalt()
-                                val totpSecret = ffiGenerateTotpSecret()
+                                // If we restored a salt, use it; otherwise generate a new one
+                                val existingSalt = VaultsStorage.loadSalt(context)
+                                val salt = existingSalt ?: ffiGenerateSalt()
+                                
+                                val existingTotp = VaultsStorage.loadTotpSecret(context)
+                                val totpSecret = existingTotp ?: ffiGenerateTotpSecret()
+
+                                // NEW: Generate and save the fingerprint
+                                val fingerprint = uniffi.vaults.ffiDerivePassphraseFingerprint(passphrase, salt)
+                                VaultsStorage.saveFingerprint(context, fingerprint)
+
                                 VaultsStorage.saveSalt(context, salt)
                                 VaultsStorage.saveTotpSecret(context, totpSecret)
-                                navController.navigate("2fa_setup/$passphrase") {
+
+                                val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
+                                navController.navigate("2fa_setup/$encoded") {
                                     popUpTo("onboarding") { inclusive = true }
                                 }
                             }
@@ -463,6 +492,17 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
                         Text("Next", style = MaterialTheme.typography.titleMedium)
                     } else {
                         Text("Create Vault", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                if (!onLastPage) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { navController.navigate("restore_backup") },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Restore from Backup", style = MaterialTheme.typography.titleMedium)
                     }
                 }
 

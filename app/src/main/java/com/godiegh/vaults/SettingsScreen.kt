@@ -174,14 +174,19 @@ fun SettingsScreen(navController: NavController) {
             item { HorizontalDivider() }
             item { SettingsSectionHeader("Security") }
 
+            // Inside SettingsScreen.kt
             item {
-                SettingsStubRow(label = "Change 2FA Method") {
-                    /* TODO: navigate back into 2fa_setup flow */
+                SettingsItemRow(label = "Change 2FA Method") {
+                    val passphrase = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
+                    val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
+
+                    navController.navigate("reauth_for_2fa/$encoded")
                 }
             }
+
             item {
-                SettingsStubRow(label = "Backup Salt") {
-                    /* TODO: export encrypted salt */
+                SettingsItemRow(label = "Backup Salt") {
+                    navController.navigate("reauth_for_backup")
                 }
             }
 
@@ -218,7 +223,7 @@ fun SettingsScreen(navController: NavController) {
             item { SettingsSectionHeader("Data") }
 
             item {
-                SettingsStubRow(
+                SettingsItemRow(
                     label = "Reset Vaults",
                     labelColor = MaterialTheme.colorScheme.error
                 ) {
@@ -286,7 +291,7 @@ private fun SettingsSectionHeader(title: String) {
 }
 
 @Composable
-private fun SettingsStubRow(
+private fun SettingsItemRow(
     label: String,
     labelColor: Color = Color.Unspecified,
     onClick: () -> Unit

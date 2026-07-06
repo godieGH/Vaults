@@ -149,4 +149,14 @@ object VaultsStorage {
     fun loadViewMode(context: Context): Int {
         return getPrefs(context).getInt(KEY_VIEW_MODE, VIEW_MODE_LIST)
     }
+
+    private const val KEY_FINGERPRINT = "passphrase_fingerprint"
+
+    fun saveFingerprint(context: Context, fingerprint: String) {
+        getPrefs(context).edit { putString(KEY_FINGERPRINT, fingerprint) }
+    }
+
+    fun loadFingerprint(context: Context): String? {
+        return getPrefs(context).getString(KEY_FINGERPRINT, null)
+    }
 }

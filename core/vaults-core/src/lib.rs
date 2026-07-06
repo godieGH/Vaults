@@ -8,6 +8,7 @@ pub use ffi::ffi_derive_master_key;
 pub use ffi::ffi_derive_pin;
 pub use ffi::ffi_generate_totp_secret;
 pub use ffi::ffi_verify_totp;
+pub use ffi::ffi_derive_passphrase_fingerprint;
 
 use rand::RngCore;
 use rand::rngs::OsRng;
@@ -96,4 +97,12 @@ pub fn verify_totp(secret: &str, code: &str) -> bool {
     ).unwrap();
 
     totp.check_current(code).unwrap_or(false)
+}
+
+pub fn derive_passphrase_fingerprint(passphrase: &str, salt: &[u8]) -> String {
+    let master_key = derive_master_key(passphrase, salt);
+    let hk = Hkdf::<Sha256>::new(None, &master_key);
+    let mut fingerprint = [0u8; 8];
+    hk.expand(b"v1|verify", &mut fingerprint).expect("HKDF expand failed");
+    hex::encode(fingerprint)
 }

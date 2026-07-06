@@ -39,6 +39,24 @@ android {
     }
 }
 
+tasks.register<Exec>("generateUniFFIBindings") {
+    workingDir("../core")
+    commandLine(
+        "cargo", "run", "--bin", "uniffi-bindgen",
+        "generate",
+        "--library", "target/aarch64-linux-android/release/libvaults_core.so",
+        "--language", "kotlin",
+        "--out-dir", "../app/src/main/java/com/godiegh/vaults/uniffi"
+    )
+    dependsOn("buildRustCore")
+}
+
+tasks.whenTaskAdded {
+    if (name == "mergeDebugJniLibFolders" || name == "mergeReleaseJniLibFolders") {
+        dependsOn("generateUniFFIBindings")
+    }
+}
+
 tasks.register<Exec>("buildRustCore") {
     workingDir("../core")
     commandLine("cargo", "ndk", "-t", "arm64-v8a", "-o", "../app/src/main/jniLibs", "build", "--release")
