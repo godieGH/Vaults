@@ -1,0 +1,212 @@
+package com.godiegh.vaults
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.FileOpen
+import org.json.JSONObject
+import android.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
+import androidx.lifecycle.viewmodel.compose.viewModel
+import uniffi.vaults.ffiGenerateTotpSecret
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RestoreBackupScreen(
+    navController: NavController,
+    vm: BackupRestoreViewModel = viewModel()
+) {
+    val context = LocalContext.current
+
+    val backupPayload by vm.backupPayload.collectAsState()
+    var backupPassword by remember { mutableStateOf("") }
+    
+    val vmError by vm.errorMessage.collectAsState()
+    var localErrorMessage by remember { mutableStateOf("") }
+    val displayError = vmError.ifEmpty { localErrorMessage }
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            vm.loadBackupFromFile(context, it)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Restore Vault") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Filled.Restore,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "Restore from Backup",
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Paste your encrypted backup data or load from a file, and enter the password you used to secure it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { openDocumentLauncher.launch(arrayOf("text/plain")) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Filled.FileOpen, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Load from File")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = backupPayload,
+                onValueChange = { vm.setBackupPayload(it); localErrorMessage = ""; vm.setErrorMessage("") },
+                label = { Text("Encrypted Backup Data") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = backupPassword,
+                onValueChange = { backupPassword = it; localErrorMessage = ""; vm.setErrorMessage("") },
+                label = { Text("Backup Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (displayError.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(displayError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = {
+                    try {
+                        val decrypted = decryptBackup(backupPayload, backupPassword)
+                        if (decrypted != null) {
+                            val backupObj = JSONObject(decrypted)
+                            
+                            // 1. Restore Salt
+                            val saltHex = backupObj.getString("salt")
+                            val salt = saltHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                            VaultsStorage.saveSalt(context, salt)
+                            
+                            // 2. Restore TOTP Secret
+                            val totpSecret = backupObj.getString("totp_secret")
+                            VaultsStorage.saveTotpSecret(context, totpSecret)
+
+                            // 3. Restore Fingerprint
+                            val fingerprint = backupObj.getString("passphrase_fingerprint")
+                            VaultsStorage.saveFingerprint(context, fingerprint)
+
+                            // 4. Restore Services
+                            val servicesArray = backupObj.getJSONArray("services")
+                            val services = (0 until servicesArray.length()).map { i ->
+                                val obj = servicesArray.getJSONObject(i)
+                                ServiceConfig(
+                                    id = obj.getString("id"),
+                                    name = obj.getString("name"),
+                                    countryCode = obj.getString("countryCode"),
+                                    identifier = obj.getString("identifier"),
+                                    pinLength = obj.getInt("pinLength"),
+                                    rotation = obj.optInt("rotation", 1),
+                                    displayName = obj.optString("displayName", obj.getString("name")),
+                                    category = obj.optString("category", "MOBILE_MONEY")
+                                )
+                            }
+                            VaultsStorage.saveServices(context, services)
+
+                            // Navigate to onboarding to set a NEW local master passphrase
+                            navController.navigate("onboarding") {
+                                popUpTo("onboarding") { inclusive = true }
+                            }
+                        } else {
+                            localErrorMessage = "Invalid backup data or password"
+                        }
+                    } catch (e: Exception) {
+                        localErrorMessage = "Restore failed: ${e.localizedMessage}"
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Restore Vault")
+            }
+        }
+    }
+}
+
+/**
+ * Real AES-GCM decryption for the backup payload.
+ */
+private fun decryptBackup(payload: String, password: String): String? {
+    if (!payload.startsWith("enc_v1:")) return null
+    
+    val parts = payload.split(":")
+    if (parts.size != 4) return null
+    
+    return try {
+        val salt = Base64.decode(parts[1], Base64.NO_WRAP)
+        val iv = Base64.decode(parts[2], Base64.NO_WRAP)
+        val ciphertext = Base64.decode(parts[3], Base64.NO_WRAP)
+
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 256)
+        val tmp = factory.generateSecret(spec)
+        val secret = SecretKeySpec(tmp.encoded, "AES")
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val gcmSpec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, secret, gcmSpec)
+
+        val decrypted = cipher.doFinal(ciphertext)
+        String(decrypted, Charsets.UTF_8)
+    } catch (e: Exception) {
+        null
+    }
+}
