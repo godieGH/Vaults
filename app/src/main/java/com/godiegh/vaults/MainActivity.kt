@@ -188,7 +188,7 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
         Triple(
             Icons.Default.Password,
             "Never Memorize a PIN Again",
-            "Manage distinct PINs for your mobile money accounts (M-Pesa, Tigo Pesa, Airtel Money), bank ATM cards, or banking apps (CRDB SimBanking, NMB Mkonjani, NBC Kiganjani) — effortlessly, without reusing them or storing them anywhere."
+            "Manage unique PINs for your mobile money accounts (M-Pesa, Tigo Pesa, Airtel Money), bank ATM cards, and banking apps (CRDB SimBanking, NMB Mkononi, NBC Kiganjani) effortlessly—without reusing or storing them anywhere."
         ),
         Triple(
             Icons.Default.CloudOff,
