@@ -150,6 +150,19 @@ object VaultsStorage {
         return getPrefs(context).getInt(KEY_VIEW_MODE, VIEW_MODE_LIST)
     }
 
+    private const val KEY_SETUP_STEP = "setup_step"
+    const val STEP_ONBOARDING = "onboarding"
+    const val STEP_2FA_SETUP = "2fa_setup"
+    const val STEP_COMPLETED = "completed"
+
+    fun saveSetupStep(context: Context, step: String) {
+        getPrefs(context).edit { putString(KEY_SETUP_STEP, step) }
+    }
+
+    fun loadSetupStep(context: Context): String {
+        return getPrefs(context).getString(KEY_SETUP_STEP, STEP_ONBOARDING) ?: STEP_ONBOARDING
+    }
+
     private const val KEY_FINGERPRINT = "passphrase_fingerprint"
 
     fun saveFingerprint(context: Context, fingerprint: String) {

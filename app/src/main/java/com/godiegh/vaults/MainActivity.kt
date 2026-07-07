@@ -6,9 +6,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,7 +70,25 @@ class MainActivity : FragmentActivity() {
             VaultsTheme {
                 val navController = rememberNavController()
                 val context = LocalContext.current
-                val startDestination = if (VaultsStorage.isOnboarded(context)) "main" else "onboarding"
+                
+                val startDestination = remember {
+                    val step = VaultsStorage.loadSetupStep(context)
+                    val onboarded = VaultsStorage.isOnboarded(context)
+                    
+                    if (onboarded) {
+                        when (step) {
+                            VaultsStorage.STEP_2FA_SETUP -> {
+                                val pass = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
+                                val encoded = java.net.URLEncoder.encode(pass, "UTF-8")
+                                "2fa_setup/$encoded"
+                            }
+                            VaultsStorage.STEP_COMPLETED -> "main"
+                            else -> "main"
+                        }
+                    } else {
+                        "onboarding"
+                    }
+                }
 
                 NavHost(navController = navController, startDestination = startDestination) {
 
@@ -219,7 +243,11 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
                 )
         ) {
             Column(
-                modifier = modifier.fillMaxSize().padding(horizontal = 24.dp),
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -475,6 +503,9 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier) {
 
                                 VaultsStorage.saveSalt(context, salt)
                                 VaultsStorage.saveTotpSecret(context, totpSecret)
+
+                                // Track that we moved to the next step
+                                VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_2FA_SETUP)
 
                                 val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
                                 navController.navigate("2fa_setup/$encoded") {

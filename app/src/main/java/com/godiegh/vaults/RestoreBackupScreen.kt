@@ -1,8 +1,14 @@
 package com.godiegh.vaults
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.*
@@ -13,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.FileOpen
@@ -41,6 +48,10 @@ fun RestoreBackupScreen(
     var localErrorMessage by remember { mutableStateOf("") }
     val displayError = vmError.ifEmpty { localErrorMessage }
 
+    val coroutineScope = rememberCoroutineScope()
+    val relocationRequester1 = remember { BringIntoViewRequester() }
+    val relocationRequester2 = remember { BringIntoViewRequester() }
+
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -65,7 +76,9 @@ fun RestoreBackupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+                .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
@@ -104,7 +117,15 @@ fun RestoreBackupScreen(
                 value = backupPayload,
                 onValueChange = { vm.setBackupPayload(it); localErrorMessage = ""; vm.setErrorMessage("") },
                 label = { Text("Encrypted Backup Data") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 160.dp)
+                    .bringIntoViewRequester(relocationRequester1)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            coroutineScope.launch { relocationRequester1.bringIntoView() }
+                        }
+                    },
                 minLines = 3
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -115,7 +136,14 @@ fun RestoreBackupScreen(
                 label = { Text("Backup Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(relocationRequester2)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            coroutineScope.launch { relocationRequester2.bringIntoView() }
+                        }
+                    }
             )
 
             if (displayError.isNotEmpty()) {
@@ -144,6 +172,12 @@ fun RestoreBackupScreen(
                             val fingerprint = backupObj.getString("passphrase_fingerprint")
                             VaultsStorage.saveFingerprint(context, fingerprint)
 
+                            // 3.1 Restore Encrypted Passphrase
+                            val encPass = backupObj.optString("encrypted_passphrase", "")
+                            if (encPass.isNotEmpty()) {
+                                VaultsStorage.saveEncryptedPassphrase(context, encPass)
+                            }
+
                             // 4. Restore Services
                             val servicesArray = backupObj.getJSONArray("services")
                             val services = (0 until servicesArray.length()).map { i ->
@@ -161,9 +195,13 @@ fun RestoreBackupScreen(
                             }
                             VaultsStorage.saveServices(context, services)
 
-                            // Navigate to onboarding to set a NEW local master passphrase
-                            navController.navigate("onboarding") {
-                                popUpTo("onboarding") { inclusive = true }
+                            // Navigate to security selection screen
+                            val pass = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
+                            val encoded = java.net.URLEncoder.encode(pass, "UTF-8")
+                            VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_2FA_SETUP)
+                            
+                            navController.navigate("2fa_setup/$encoded") {
+                                popUpTo("restore_backup") { inclusive = true }
                             }
                         } else {
                             localErrorMessage = "Invalid backup data or password"

@@ -57,6 +57,7 @@ fun TwoFactorSetupScreen(
                 onClick = {
                     VaultsStorage.saveTier(context, TIER_PASSPHRASE_ONLY)
                     VaultsStorage.saveEncryptedPassphrase(context, passphrase)
+                    VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
                     navController.navigate("main") {
                         popUpTo("onboarding") { inclusive = true }
                     }
@@ -73,6 +74,7 @@ fun TwoFactorSetupScreen(
                 onClick = {
                     VaultsStorage.saveTier(context, TIER_BIOMETRIC)
                     VaultsStorage.saveEncryptedPassphrase(context, passphrase)
+                    VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
                     navController.navigate("main") {
                         popUpTo("onboarding") { inclusive = true }
                     }

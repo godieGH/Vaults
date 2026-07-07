@@ -183,6 +183,7 @@ fun BackupSaltScreen(
                             backupObj.put("salt", VaultsStorage.loadSalt(context)?.joinToString("") { "%02x".format(it) } ?: "")
                             backupObj.put("totp_secret", VaultsStorage.loadTotpSecret(context) ?: "")
                             backupObj.put("passphrase_fingerprint", VaultsStorage.loadFingerprint(context) ?: "")
+                            backupObj.put("encrypted_passphrase", VaultsStorage.loadEncryptedPassphrase(context) ?: "")
                             
                             val services = VaultsStorage.loadServices(context)
                             val servicesArray = JSONArray()

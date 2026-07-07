@@ -185,7 +185,7 @@ fun SettingsScreen(navController: NavController) {
             }
 
             item {
-                SettingsItemRow(label = "Backup Salt") {
+                SettingsItemRow(label = "Backup App Data") {
                     navController.navigate("reauth_for_backup")
                 }
             }

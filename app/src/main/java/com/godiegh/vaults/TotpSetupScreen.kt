@@ -13,6 +13,7 @@ import androidx.navigation.NavController
 
 @Composable
 fun TotpSetupScreen(secret: String, navController: NavController) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
     Surface(
@@ -59,6 +60,7 @@ fun TotpSetupScreen(secret: String, navController: NavController) {
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = {
+                    VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
                     navController.navigate("main") {
                         popUpTo("totp_setup/$secret") { inclusive = true }
                     }
