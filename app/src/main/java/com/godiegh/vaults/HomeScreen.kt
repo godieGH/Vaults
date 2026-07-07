@@ -539,9 +539,14 @@ fun ServiceRowItem(
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(service.displayName, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    when (service.category) {
+                    text = service.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    text = when (service.category) {
                         "MOBILE_MONEY" -> "${service.countryCode.uppercase()} ${service.identifier}"
                         "BANK" -> "Acc: ${service.identifier}"
                         "CARD" -> "•••• ${service.identifier}"
@@ -549,7 +554,9 @@ fun ServiceRowItem(
                         else -> service.identifier
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
 
@@ -646,9 +653,15 @@ private fun ServiceGridItem(
             }
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text(service.displayName, style = MaterialTheme.typography.titleMedium)
             Text(
-                when (service.category) {
+                text = service.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Text(
+                text = when (service.category) {
                     "MOBILE_MONEY" -> "${service.countryCode.uppercase()} ${service.identifier}"
                     "BANK" -> "Acc: ${service.identifier}"
                     "CARD" -> "•••• ${service.identifier}"
@@ -656,7 +669,10 @@ private fun ServiceGridItem(
                     else -> service.identifier
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(6.dp))

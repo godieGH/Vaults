@@ -59,7 +59,7 @@ tasks.whenTaskAdded {
 
 tasks.register<Exec>("buildRustCore") {
     workingDir("../core")
-    commandLine("cargo", "ndk", "-t", "arm64-v8a", "-o", "../app/src/main/jniLibs", "build", "--release")
+    commandLine("cargo", "ndk", "-t", "arm64-v8a", "-t", "x86_64", "-o", "../app/src/main/jniLibs", "build", "--release")
 }
 
 tasks.whenTaskAdded {
@@ -84,6 +84,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.biometric:biometric:1.1.0")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

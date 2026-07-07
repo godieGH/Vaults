@@ -1,5 +1,7 @@
 package com.godiegh.vaults
 
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
@@ -25,6 +27,14 @@ fun TwoFactorSetupScreen(
     navController: NavController
 ) {
     val context = LocalContext.current
+
+    // Check if biometric authentication is available and enrolled
+    val isBiometricAvailable = remember {
+        val biometricManager = BiometricManager.from(context)
+        val result = biometricManager.canAuthenticate(BIOMETRIC_STRONG)
+        result == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -33,8 +43,7 @@ fun TwoFactorSetupScreen(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
-        )
-        {
+        ) {
             Text(
                 "Choose Your Security Method",
                 style = MaterialTheme.typography.headlineMedium,
@@ -49,7 +58,7 @@ fun TwoFactorSetupScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Option 1 — Passphrase only
+            // Option 1 — Passphrase only (Always available)
             SecurityOptionCard(
                 icon = { Icon(Icons.Filled.LockOpen, null, modifier = Modifier.size(32.dp)) },
                 title = "Passphrase Only",
@@ -64,26 +73,27 @@ fun TwoFactorSetupScreen(
                 }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Option 2 — Biometric
-            SecurityOptionCard(
-                icon = { Icon(Icons.Filled.Fingerprint, null, modifier = Modifier.size(32.dp)) },
-                title = "Biometric (Recommended)",
-                description = "Use fingerprint or face unlock. Your passphrase is stored securely on device.",
-                onClick = {
-                    VaultsStorage.saveTier(context, TIER_BIOMETRIC)
-                    VaultsStorage.saveEncryptedPassphrase(context, passphrase)
-                    VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
-                    navController.navigate("main") {
-                        popUpTo("onboarding") { inclusive = true }
+            // Option 2 — Biometric (Conditional)
+            if (isBiometricAvailable) {
+                Spacer(modifier = Modifier.height(12.dp))
+                SecurityOptionCard(
+                    icon = { Icon(Icons.Filled.Fingerprint, null, modifier = Modifier.size(32.dp)) },
+                    title = "Biometric (Recommended)",
+                    description = "Use fingerprint or face unlock. Your passphrase is stored securely on device.",
+                    onClick = {
+                        VaultsStorage.saveTier(context, TIER_BIOMETRIC)
+                        VaultsStorage.saveEncryptedPassphrase(context, passphrase)
+                        VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
+                        navController.navigate("main") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
                     }
-                }
-            )
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Option 3 — TOTP
+            // Option 3 — TOTP (Always available)
             SecurityOptionCard(
                 icon = { Icon(Icons.Filled.Shield, null, modifier = Modifier.size(32.dp)) },
                 title = "TOTP Authenticator",
@@ -98,26 +108,26 @@ fun TwoFactorSetupScreen(
                 }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Option 4 — TOTP + Biometric
-            SecurityOptionCard(
-                icon = { Icon(Icons.Filled.Lock, null, modifier = Modifier.size(32.dp)) },
-                title = "TOTP + Biometric",
-                description = "Strongest option. Requires both an authenticator code and your fingerprint.",
-                onClick = {
-                    VaultsStorage.saveTier(context, TIER_TOTP_BIOMETRIC)
-                    VaultsStorage.saveEncryptedPassphrase(context, passphrase)
-                    val totpSecret = VaultsStorage.loadTotpSecret(context) ?: ""
-                    navController.navigate("totp_setup/$totpSecret") {
-                        popUpTo("onboarding") { inclusive = true }
+            // Option 4 — TOTP + Biometric (Conditional)
+            if (isBiometricAvailable) {
+                Spacer(modifier = Modifier.height(12.dp))
+                SecurityOptionCard(
+                    icon = { Icon(Icons.Filled.Lock, null, modifier = Modifier.size(32.dp)) },
+                    title = "TOTP + Biometric",
+                    description = "Strongest option. Requires both an authenticator code and your fingerprint.",
+                    onClick = {
+                        VaultsStorage.saveTier(context, TIER_TOTP_BIOMETRIC)
+                        VaultsStorage.saveEncryptedPassphrase(context, passphrase)
+                        val totpSecret = VaultsStorage.loadTotpSecret(context) ?: ""
+                        navController.navigate("totp_setup/$totpSecret") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }
-
 
 @Composable
 fun SecurityOptionCard(

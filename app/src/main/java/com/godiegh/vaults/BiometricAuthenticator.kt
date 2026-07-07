@@ -16,14 +16,16 @@ object BiometricAuthenticator {
     fun canAuthenticate(activity: FragmentActivity): Boolean {
         val biometricManager = BiometricManager.from(activity)
         return biometricManager.canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
         ) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     fun authenticate(
         activity: FragmentActivity,
         title: String = "Unlock Vault",
-        subtitle: String = "Confirm your identity to reveal this PIN",
+        subtitle: String = "Confirm your identity to continue",
         onResult: (Result) -> Unit
     ) {
         if (!canAuthenticate(activity)) {
@@ -58,8 +60,11 @@ object BiometricAuthenticator {
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .setSubtitle(subtitle)
-            .setNegativeButtonText("Cancel")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
             .build()
 
         val biometricPrompt = BiometricPrompt(activity, executor, callback)

@@ -104,7 +104,7 @@ fun ReAuthForBackupScreen(navController: NavController) {
                                 errorMessage = "Unable to launch biometric prompt"
                                 return@Button
                             }
-                            BiometricAuthenticator.authenticate(activity) { result ->
+                            BiometricAuthenticator.authenticate(activity, subtitle = "Confirm your identity to backup your app data") { result ->
                                 when (result) {
                                     is BiometricAuthenticator.Result.Success -> {
                                         navController.navigate("backup_salt") {

@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,38 +135,56 @@ fun AddServiceScreen(navController: NavController) {
 
             // --- CATEGORY PICKER ---
             Text("What are you linking?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                ServiceCategory.entries.forEach { category ->
-                    val selected = category == selectedCategory
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clickable {
-                                selectedCategory = category
-                                selectedService = null
-                                personalNumber = ""
-                            },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Split entries into pairs of 2 rows
+                val chunks = ServiceCategory.entries.chunked(2)
+                chunks.forEach { rowCategories ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize().padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                category.icon,
-                                contentDescription = null,
-                                tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                category.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                textAlign = TextAlign.Center,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        rowCategories.forEach { category ->
+                            val selected = category == selectedCategory
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f) // Automatically splits width evenly 50/50
+                                    .height(72.dp) // Lower height since it's a grid cell
+                                    .clickable {
+                                        selectedCategory = category
+                                        selectedService = null
+                                        personalNumber = ""
+                                    },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        category.icon,
+                                        contentDescription = null,
+                                        tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        category.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        // If the last row has an odd number of elements, insert an empty box to maintain structure
+                        if (rowCategories.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
