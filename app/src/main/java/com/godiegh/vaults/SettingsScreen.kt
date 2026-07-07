@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
@@ -37,7 +37,7 @@ fun SettingsScreen(navController: NavController) {
                 context.packageManager.getPackageInfo(context.packageName, 0)
             }
             packageInfo.versionName ?: "1.0"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "1.0"
         }
     }
@@ -45,14 +45,14 @@ fun SettingsScreen(navController: NavController) {
     var showClearDataDialog by remember { mutableStateOf(false) }
 
     var themeMode by remember {
-        mutableStateOf(
+        mutableIntStateOf(
             VaultsStorage.loadThemeMode(context).takeIf {
                 it in listOf(VaultsStorage.THEME_SYSTEM, VaultsStorage.THEME_LIGHT, VaultsStorage.THEME_DARK)
             } ?: VaultsStorage.THEME_SYSTEM
         )
     }
     var accentPreset by remember {
-        mutableStateOf(
+        mutableIntStateOf(
             VaultsStorage.loadAccentPreset(context).takeIf {
                 it in listOf(
                     VaultsStorage.ACCENT_CLASSIC,
@@ -99,7 +99,7 @@ fun SettingsScreen(navController: NavController) {
                             navController.navigate("main")
                         }
                     }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
