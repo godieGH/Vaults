@@ -38,7 +38,7 @@ fun SettingsScreen(navController: NavController) {
             }
             packageInfo.versionName ?: "1.0"
         } catch (e: Exception) {
-            "1.0" // Fallback if everything goes sideways
+            "1.0"
         }
     }
 
