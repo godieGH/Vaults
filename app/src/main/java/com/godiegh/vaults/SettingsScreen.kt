@@ -27,6 +27,21 @@ private data class AccentOption(val value: Int, val label: String, val primary: 
 fun SettingsScreen(navController: NavController) {
     val context = LocalContext.current
 
+    // Dynamically fetch the versionName from build.gradle
+    val versionName = remember {
+        try {
+            val packageInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            packageInfo.versionName ?: "1.0"
+        } catch (e: Exception) {
+            "1.0" // Fallback if everything goes sideways
+        }
+    }
+
     var showClearDataDialog by remember { mutableStateOf(false) }
 
     var themeMode by remember {
@@ -235,7 +250,7 @@ fun SettingsScreen(navController: NavController) {
 
             item {
                 Text(
-                    text = "Vaults v1.0.0",
+                    text = "Vaults v$versionName",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
