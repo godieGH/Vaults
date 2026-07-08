@@ -1,89 +1,625 @@
 {
   "countries": [
-    {"name":"Algeria","code":"+213","abbrev":"dz"},
-    {"name":"Angola","code":"+244","abbrev":"ao"},
-    {"name":"Benin","code":"+229","abbrev":"bj"},
-    {"name":"Botswana","code":"+267","abbrev":"bw"},
-    {"name":"Burkina Faso","code":"+226","abbrev":"bf"},
-    {"name":"Burundi","code":"+257","abbrev":"bi"},
-    {"name":"Cameroon","code":"+237","abbrev":"cm"},
-    {"name":"Cape Verde","code":"+238","abbrev":"cv"},
-    {"name":"Central African Republic","code":"+236","abbrev":"cf"},
-    {"name":"Chad","code":"+235","abbrev":"td"},
-    {"name":"Comoros","code":"+269","abbrev":"km"},
-    {"name":"Republic of Congo","code":"+242","abbrev":"cg"},
-    {"name":"DRC","code":"+243","abbrev":"cd"},
-    {"name":"Djibouti","code":"+253","abbrev":"dj"},
-    {"name":"Egypt","code":"+20","abbrev":"eg"},
-    {"name":"Equatorial Guinea","code":"+240","abbrev":"gq"},
-    {"name":"Eritrea","code":"+291","abbrev":"er"},
-    {"name":"Eswatini","code":"+268","abbrev":"sz"},
-    {"name":"Ethiopia","code":"+251","abbrev":"et"},
-    {"name":"Gabon","code":"+241","abbrev":"ga"},
-    {"name":"Gambia","code":"+220","abbrev":"gm"},
-    {"name":"Ghana","code":"+233","abbrev":"gh"},
-    {"name":"Guinea","code":"+224","abbrev":"gn"},
-    {"name":"Guinea-Bissau","code":"+245","abbrev":"gw"},
-    {"name":"Ivory Coast","code":"+225","abbrev":"ci"},
-    {"name":"Kenya","code":"+254","abbrev":"ke"},
-    {"name":"Lesotho","code":"+266","abbrev":"ls"},
-    {"name":"Liberia","code":"+231","abbrev":"lr"},
-    {"name":"Libya","code":"+218","abbrev":"ly"},
-    {"name":"Madagascar","code":"+261","abbrev":"mg"},
-    {"name":"Malawi","code":"+265","abbrev":"mw"},
-    {"name":"Mali","code":"+223","abbrev":"ml"},
-    {"name":"Mauritania","code":"+222","abbrev":"mr"},
-    {"name":"Mauritius","code":"+230","abbrev":"mu"},
-    {"name":"Morocco","code":"+212","abbrev":"ma"},
-    {"name":"Mozambique","code":"+258","abbrev":"mz"},
-    {"name":"Namibia","code":"+264","abbrev":"na"},
-    {"name":"Niger","code":"+227","abbrev":"ne"},
-    {"name":"Nigeria","code":"+234","abbrev":"ng"},
-    {"name":"Rwanda","code":"+250","abbrev":"rw"},
-    {"name":"Senegal","code":"+221","abbrev":"sn"},
-    {"name":"Seychelles","code":"+248","abbrev":"sc"},
-    {"name":"Sierra Leone","code":"+232","abbrev":"sl"},
-    {"name":"Somalia","code":"+252","abbrev":"so"},
-    {"name":"South Africa","code":"+27","abbrev":"za"},
-    {"name":"South Sudan","code":"+211","abbrev":"ss"},
-    {"name":"Sudan","code":"+249","abbrev":"sd"},
-    {"name":"Tanzania","code":"+255","abbrev":"tz"},
-    {"name":"Togo","code":"+228","abbrev":"tg"},
-    {"name":"Tunisia","code":"+216","abbrev":"tn"},
-    {"name":"Uganda","code":"+256","abbrev":"ug"},
-    {"name":"Zambia","code":"+260","abbrev":"zm"},
-    {"name":"Zimbabwe","code":"+263","abbrev":"zw"}
+    {
+      "name": "Algeria",
+      "code": "+213",
+      "abbrev": "dz",
+      "mobileLength": 9
+    },
+    {
+      "name": "Angola",
+      "code": "+244",
+      "abbrev": "ao",
+      "mobileLength": 9
+    },
+    {
+      "name": "Benin",
+      "code": "+229",
+      "abbrev": "bj",
+      "mobileLength": 8
+    },
+    {
+      "name": "Botswana",
+      "code": "+267",
+      "abbrev": "bw",
+      "mobileLength": 8
+    },
+    {
+      "name": "Burkina Faso",
+      "code": "+226",
+      "abbrev": "bf",
+      "mobileLength": 8
+    },
+    {
+      "name": "Burundi",
+      "code": "+257",
+      "abbrev": "bi",
+      "mobileLength": 8
+    },
+    {
+      "name": "Cameroon",
+      "code": "+237",
+      "abbrev": "cm",
+      "mobileLength": 9
+    },
+    {
+      "name": "Cape Verde",
+      "code": "+238",
+      "abbrev": "cv",
+      "mobileLength": 7
+    },
+    {
+      "name": "Central African Republic",
+      "code": "+236",
+      "abbrev": "cf",
+      "mobileLength": 8
+    },
+    {
+      "name": "Chad",
+      "code": "+235",
+      "abbrev": "td",
+      "mobileLength": 8
+    },
+    {
+      "name": "Comoros",
+      "code": "+269",
+      "abbrev": "km",
+      "mobileLength": 7
+    },
+    {
+      "name": "Republic of Congo",
+      "code": "+242",
+      "abbrev": "cg",
+      "mobileLength": 9
+    },
+    {
+      "name": "DRC",
+      "code": "+243",
+      "abbrev": "cd",
+      "mobileLength": 9
+    },
+    {
+      "name": "Djibouti",
+      "code": "+253",
+      "abbrev": "dj",
+      "mobileLength": 8
+    },
+    {
+      "name": "Egypt",
+      "code": "+20",
+      "abbrev": "eg",
+      "mobileLength": 10
+    },
+    {
+      "name": "Equatorial Guinea",
+      "code": "+240",
+      "abbrev": "gq",
+      "mobileLength": 9
+    },
+    {
+      "name": "Eritrea",
+      "code": "+291",
+      "abbrev": "er",
+      "mobileLength": 7
+    },
+    {
+      "name": "Eswatini",
+      "code": "+268",
+      "abbrev": "sz",
+      "mobileLength": 8
+    },
+    {
+      "name": "Ethiopia",
+      "code": "+251",
+      "abbrev": "et",
+      "mobileLength": 9
+    },
+    {
+      "name": "Gabon",
+      "code": "+241",
+      "abbrev": "ga",
+      "mobileLength": 8
+    },
+    {
+      "name": "Gambia",
+      "code": "+220",
+      "abbrev": "gm",
+      "mobileLength": 7
+    },
+    {
+      "name": "Ghana",
+      "code": "+233",
+      "abbrev": "gh",
+      "mobileLength": 9
+    },
+    {
+      "name": "Guinea",
+      "code": "+224",
+      "abbrev": "gn",
+      "mobileLength": 9
+    },
+    {
+      "name": "Guinea-Bissau",
+      "code": "+245",
+      "abbrev": "gw",
+      "mobileLength": 7
+    },
+    {
+      "name": "Ivory Coast",
+      "code": "+225",
+      "abbrev": "ci",
+      "mobileLength": 10
+    },
+    {
+      "name": "Kenya",
+      "code": "+254",
+      "abbrev": "ke",
+      "mobileLength": 9
+    },
+    {
+      "name": "Lesotho",
+      "code": "+266",
+      "abbrev": "ls",
+      "mobileLength": 8
+    },
+    {
+      "name": "Liberia",
+      "code": "+231",
+      "abbrev": "lr",
+      "mobileLength": 8
+    },
+    {
+      "name": "Libya",
+      "code": "+218",
+      "abbrev": "ly",
+      "mobileLength": 9
+    },
+    {
+      "name": "Madagascar",
+      "code": "+261",
+      "abbrev": "mg",
+      "mobileLength": 9
+    },
+    {
+      "name": "Malawi",
+      "code": "+265",
+      "abbrev": "mw",
+      "mobileLength": 9
+    },
+    {
+      "name": "Mali",
+      "code": "+223",
+      "abbrev": "ml",
+      "mobileLength": 8
+    },
+    {
+      "name": "Mauritania",
+      "code": "+222",
+      "abbrev": "mr",
+      "mobileLength": 8
+    },
+    {
+      "name": "Mauritius",
+      "code": "+230",
+      "abbrev": "mu",
+      "mobileLength": 8
+    },
+    {
+      "name": "Morocco",
+      "code": "+212",
+      "abbrev": "ma",
+      "mobileLength": 9
+    },
+    {
+      "name": "Mozambique",
+      "code": "+258",
+      "abbrev": "mz",
+      "mobileLength": 9
+    },
+    {
+      "name": "Namibia",
+      "code": "+264",
+      "abbrev": "na",
+      "mobileLength": 9
+    },
+    {
+      "name": "Niger",
+      "code": "+227",
+      "abbrev": "ne",
+      "mobileLength": 8
+    },
+    {
+      "name": "Nigeria",
+      "code": "+234",
+      "abbrev": "ng",
+      "mobileLength": 10
+    },
+    {
+      "name": "Rwanda",
+      "code": "+250",
+      "abbrev": "rw",
+      "mobileLength": 9
+    },
+    {
+      "name": "Senegal",
+      "code": "+221",
+      "abbrev": "sn",
+      "mobileLength": 9
+    },
+    {
+      "name": "Seychelles",
+      "code": "+248",
+      "abbrev": "sc",
+      "mobileLength": 7
+    },
+    {
+      "name": "Sierra Leone",
+      "code": "+232",
+      "abbrev": "sl",
+      "mobileLength": 8
+    },
+    {
+      "name": "Somalia",
+      "code": "+252",
+      "abbrev": "so",
+      "mobileLength": 8
+    },
+    {
+      "name": "South Africa",
+      "code": "+27",
+      "abbrev": "za",
+      "mobileLength": 9
+    },
+    {
+      "name": "South Sudan",
+      "code": "+211",
+      "abbrev": "ss",
+      "mobileLength": 9
+    },
+    {
+      "name": "Sudan",
+      "code": "+249",
+      "abbrev": "sd",
+      "mobileLength": 9
+    },
+    {
+      "name": "Tanzania",
+      "code": "+255",
+      "abbrev": "tz",
+      "mobileLength": 9
+    },
+    {
+      "name": "Togo",
+      "code": "+228",
+      "abbrev": "tg",
+      "mobileLength": 8
+    },
+    {
+      "name": "Tunisia",
+      "code": "+216",
+      "abbrev": "tn",
+      "mobileLength": 8
+    },
+    {
+      "name": "Uganda",
+      "code": "+256",
+      "abbrev": "ug",
+      "mobileLength": 9
+    },
+    {
+      "name": "Zambia",
+      "code": "+260",
+      "abbrev": "zm",
+      "mobileLength": 9
+    },
+    {
+      "name": "Zimbabwe",
+      "code": "+263",
+      "abbrev": "zw",
+      "mobileLength": 9
+    }
   ],
   "services": [
     {
-      "displayName": "Airtel Money",
-      "rustKey": "airtelmoney",
-      "category": "MOBILE_MONEY"
+      "displayName": "M-Pesa",
+      "rustKey": "mpesa",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ke",
+        "tz"
+      ]
     },
     {
-      "displayName": "CellFin",
-      "rustKey": "cellfin",
-      "category": "WALLET"
+      "displayName": "Vodacom M-Pesa",
+      "rustKey": "vodacommpesa",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "cd",
+        "mz",
+        "ls"
+      ]
+    },
+    {
+      "displayName": "Airtel Money",
+      "rustKey": "airtelmoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ke",
+        "tz",
+        "ug",
+        "rw",
+        "zm",
+        "mw",
+        "ng",
+        "mg",
+        "ne",
+        "td",
+        "cd",
+        "cg",
+        "ga"
+      ]
+    },
+    {
+      "displayName": "MTN Mobile Money",
+      "rustKey": "mtnmomo",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ug",
+        "rw",
+        "gh",
+        "ci",
+        "cm",
+        "bj",
+        "cg",
+        "sz",
+        "zm",
+        "lr",
+        "gn",
+        "sl",
+        "ng"
+      ]
+    },
+    {
+      "displayName": "Orange Money",
+      "rustKey": "orangemoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "sn",
+        "ci",
+        "cm",
+        "ml",
+        "ne",
+        "cd",
+        "gn",
+        "cf",
+        "bf"
+      ]
+    },
+    {
+      "displayName": "Mixx By Yas (TigoPesa)",
+      "rustKey": "tigopesa",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "tz"
+      ]
+    },
+    {
+      "displayName": "Halotel HaloPesa",
+      "rustKey": "halopesa",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "tz"
+      ]
+    },
+    {
+      "displayName": "Moov Money",
+      "rustKey": "moovmoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ci",
+        "bj",
+        "tg",
+        "ne"
+      ]
+    },
+    {
+      "displayName": "Telebirr",
+      "rustKey": "telebirr",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "et"
+      ]
+    },
+    {
+      "displayName": "Tigo Cash",
+      "rustKey": "tigocash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "tz"
+      ]
+    },
+    {
+      "displayName": "Zain Cash",
+      "rustKey": "zaincash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "sd"
+      ]
+    },
+    {
+      "displayName": "EVC Plus",
+      "rustKey": "evcplus",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "so"
+      ]
+    },
+    {
+      "displayName": "Wave",
+      "rustKey": "wave",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "sn",
+        "ci",
+        "ug",
+        "gm",
+        "ml",
+        "bf"
+      ]
     },
     {
       "displayName": "CRDB SimBanking",
       "rustKey": "crdbsimbanking",
-      "category": "BANK"
+      "category": "BANK",
+      "countries": [
+        "tz"
+      ]
     },
     {
-      "displayName": "Ecobank Mobile",
-      "rustKey": "ecobankmobile",
-      "category": "BANK"
+      "displayName": "NMB Mkononi",
+      "rustKey": "nmbmkononi",
+      "category": "BANK",
+      "countries": [
+        "tz"
+      ]
+    },
+    {
+      "displayName": "NBC Kiganjani",
+      "rustKey": "nbckiganjani",
+      "category": "BANK",
+      "countries": [
+        "tz"
+      ]
     },
     {
       "displayName": "Equity Bank",
       "rustKey": "equitybank",
-      "category": "BANK"
+      "category": "BANK",
+      "countries": [
+        "ke",
+        "ug",
+        "tz",
+        "rw",
+        "ss",
+        "cd"
+      ]
     },
     {
-      "displayName": "Easypaisa",
-      "rustKey": "easypaisa",
-      "category": "WALLET"
+      "displayName": "KCB M-Pesa",
+      "rustKey": "kcbmpesa",
+      "category": "BANK",
+      "countries": [
+        "ke"
+      ]
+    },
+    {
+      "displayName": "Kuda Bank",
+      "rustKey": "kuda",
+      "category": "BANK",
+      "countries": [
+        "ng"
+      ]
+    },
+    {
+      "displayName": "Wema Bank",
+      "rustKey": "wemabank",
+      "category": "BANK",
+      "countries": [
+        "ng"
+      ]
+    },
+    {
+      "displayName": "GTBank",
+      "rustKey": "gtbank",
+      "category": "BANK",
+      "countries": [
+        "ng",
+        "gh",
+        "ug",
+        "ke",
+        "rw",
+        "tz",
+        "sl",
+        "gm",
+        "cd",
+        "lr"
+      ]
+    },
+    {
+      "displayName": "Ecobank Mobile",
+      "rustKey": "ecobankmobile",
+      "category": "BANK",
+      "countries": [
+        "ci",
+        "gh",
+        "ng",
+        "sn",
+        "cm",
+        "tg",
+        "bj",
+        "ml",
+        "ne",
+        "cd",
+        "gn",
+        "gw",
+        "cv",
+        "lr",
+        "sl",
+        "gm",
+        "cg",
+        "td",
+        "gq",
+        "za"
+      ]
+    },
+    {
+      "displayName": "Absa Bank",
+      "rustKey": "absabank",
+      "category": "BANK",
+      "countries": [
+        "za",
+        "ke",
+        "gh",
+        "mz",
+        "zm",
+        "bw",
+        "mw",
+        "mu",
+        "tz",
+        "ug"
+      ]
+    },
+    {
+      "displayName": "Standard Bank",
+      "rustKey": "standardbank",
+      "category": "BANK",
+      "countries": [
+        "za",
+        "ng",
+        "gh",
+        "mz",
+        "na",
+        "zm",
+        "mw",
+        "bw",
+        "sz",
+        "ls",
+        "ao",
+        "cd",
+        "ke"
+      ]
+    },
+    {
+      "displayName": "Nedbank",
+      "rustKey": "nedbank",
+      "category": "BANK",
+      "countries": [
+        "za",
+        "sz",
+        "ls",
+        "na",
+        "mz"
+      ]
     },
     {
       "displayName": "Generic ATM Card",
@@ -91,94 +627,80 @@
       "category": "CARD"
     },
     {
-      "displayName": "Halotel HaloPesa",
-      "rustKey": "halopesa",
-      "category": "MOBILE_MONEY"
+      "displayName": "Visa Debit/Credit Card",
+      "rustKey": "visacard",
+      "category": "CARD"
     },
     {
-      "displayName": "Interswitch",
-      "rustKey": "interswitch",
-      "category": "PAYMENT"
+      "displayName": "Mastercard Debit/Credit Card",
+      "rustKey": "mastercard",
+      "category": "CARD"
     },
     {
-      "displayName": "KCB M-Pesa",
-      "rustKey": "kcbmpesa",
-      "category": "BANK"
+      "displayName": "Verve Card",
+      "rustKey": "vervecard",
+      "category": "CARD",
+      "countries": [
+        "ng",
+        "gh",
+        "ug",
+        "ke"
+      ]
     },
     {
-      "displayName": "Kuda Bank",
-      "rustKey": "kuda",
-      "category": "BANK"
+      "displayName": "CellFin",
+      "rustKey": "cellfin",
+      "category": "WALLET",
+      "countries": [
+        "ci"
+      ]
     },
     {
-      "displayName": "M-Pesa",
-      "rustKey": "mpesa",
-      "category": "MOBILE_MONEY"
-    },
-    {
-      "displayName": "MTN Mobile Money",
-      "rustKey": "mtnmomo",
-      "category": "MOBILE_MONEY"
-    },
-    {
-      "displayName": "Mixx By Yas (TigoPesa)",
-      "rustKey": "tigopesa",
-      "category": "MOBILE_MONEY"
-    },
-    {
-      "displayName": "Moov Money",
-      "rustKey": "moovmoney",
-      "category": "MOBILE_MONEY"
+      "displayName": "Easypaisa",
+      "rustKey": "easypaisa",
+      "category": "WALLET"
     },
     {
       "displayName": "Nala App",
       "rustKey": "nala",
-      "category": "WALLET"
-    },
-    {
-      "displayName": "Nedbank Money",
-      "rustKey": "nedbank",
-      "category": "BANK"
-    },
-    {
-      "displayName": "NMB Mkononi",
-      "rustKey": "nmbmkononi",
-      "category": "BANK"
-    },
-    {
-      "displayName": "NBC Kiganjani",
-      "rustKey": "nbckiganjani",
-      "category": "BANK"
-    },
-    {
-      "displayName": "Orange Money",
-      "rustKey": "orangemoney",
-      "category": "MOBILE_MONEY"
+      "category": "WALLET",
+      "countries": [
+        "tz",
+        "ke",
+        "ug"
+      ]
     },
     {
       "displayName": "Paga",
       "rustKey": "paga",
-      "category": "WALLET"
+      "category": "WALLET",
+      "countries": [
+        "ng"
+      ]
     },
     {
       "displayName": "PalmPay",
       "rustKey": "palmpay",
-      "category": "WALLET"
-    },
-    {
-      "displayName": "Paystack",
-      "rustKey": "paystack",
-      "category": "PAYMENT"
+      "category": "WALLET",
+      "countries": [
+        "ng"
+      ]
     },
     {
       "displayName": "SasaPay",
       "rustKey": "sasapay",
-      "category": "WALLET"
+      "category": "WALLET",
+      "countries": [
+        "ke"
+      ]
     },
     {
       "displayName": "Selcom Pay",
       "rustKey": "selcom",
-      "category": "WALLET"
+      "category": "WALLET",
+      "countries": [
+        "tz"
+      ]
     },
     {
       "displayName": "Skrill",
@@ -186,49 +708,132 @@
       "category": "WALLET"
     },
     {
-      "displayName": "Standard Bank",
-      "rustKey": "standardbank",
-      "category": "BANK"
-    },
-    {
-      "displayName": "Telebirr",
-      "rustKey": "telebirr",
-      "category": "MOBILE_MONEY"
-    },
-    {
-      "displayName": "Tigo Cash",
-      "rustKey": "tigocash",
-      "category": "MOBILE_MONEY"
-    },
-    {
       "displayName": "Touch 'n Go",
       "rustKey": "touchngo",
       "category": "WALLET"
     },
     {
-      "displayName": "Vodacom M-Pesa",
-      "rustKey": "vodacommpesa",
-      "category": "MOBILE_MONEY"
+      "displayName": "Chipper Cash",
+      "rustKey": "chippercash",
+      "category": "WALLET",
+      "countries": [
+        "ug",
+        "gh",
+        "ng",
+        "rw",
+        "ke",
+        "tz",
+        "za",
+        "zm"
+      ]
     },
     {
-      "displayName": "Wave",
-      "rustKey": "wave",
+      "displayName": "PayPal",
+      "rustKey": "paypal",
       "category": "WALLET"
     },
     {
-      "displayName": "Wema Bank",
-      "rustKey": "wemabank",
-      "category": "BANK"
+      "displayName": "Payoneer",
+      "rustKey": "payoneer",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Revolut",
+      "rustKey": "revolut",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Cash App",
+      "rustKey": "cashapp",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Venmo",
+      "rustKey": "venmo",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Apple Pay",
+      "rustKey": "applepay",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Google Pay",
+      "rustKey": "googlepay",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "WeChat Pay",
+      "rustKey": "wechatpay",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Alipay",
+      "rustKey": "alipay",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "GCash",
+      "rustKey": "gcash",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Chime",
+      "rustKey": "chime",
+      "category": "WALLET"
+    },
+    {
+      "displayName": "Interswitch",
+      "rustKey": "interswitch",
+      "category": "PAYMENT",
+      "countries": [
+        "ng",
+        "gh",
+        "ug",
+        "ke",
+        "gm",
+        "sl"
+      ]
+    },
+    {
+      "displayName": "Paystack",
+      "rustKey": "paystack",
+      "category": "PAYMENT",
+      "countries": [
+        "ng",
+        "gh",
+        "za",
+        "ke",
+        "ci"
+      ]
     },
     {
       "displayName": "Yoco",
       "rustKey": "yoco",
+      "category": "PAYMENT",
+      "countries": [
+        "za"
+      ]
+    },
+    {
+      "displayName": "Wise",
+      "rustKey": "wise",
       "category": "PAYMENT"
     },
     {
-      "displayName": "Zain Cash",
-      "rustKey": "zaincash",
-      "category": "WALLET"
+      "displayName": "Zelle",
+      "rustKey": "zelle",
+      "category": "PAYMENT"
+    },
+    {
+      "displayName": "Western Union",
+      "rustKey": "westernunion",
+      "category": "PAYMENT"
+    },
+    {
+      "displayName": "MoneyGram",
+      "rustKey": "moneygram",
+      "category": "PAYMENT"
     }
   ]
 }

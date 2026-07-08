@@ -36,16 +36,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
-data class CountryInfo(val name: String, val code: String, val abbrev: String)
+data class CountryInfo(
+    val name: String,
+    val code: String,
+    val abbrev: String,
+    // National subscriber-number length (digits typed after removing a leading 0 or the country code).
+    // Used to validate mobile money numbers. Defaults to 9 if a country entry omits it.
+    val mobileLength: Int = 9
+)
+
 enum class ServiceCategory(val label: String, val icon: ImageVector) {
     MOBILE_MONEY("Mobile Money", Icons.Filled.PhoneAndroid),
     BANK("Bank Account", Icons.Filled.AccountBalance),
     CARD("ATM / Card", Icons.Filled.CreditCard),
-    WALLET("Wallet / Apps Services", Icons.Filled.Wallet),
-//    PAYMENT("Payment", Icons.Filled.Payment)
+    WALLET("Wallet / Apps", Icons.Filled.Wallet),
+    PAYMENT("Payment / Gateway", Icons.Filled.Payment)
 }
 
-data class ServiceInfo(val displayName: String, val rustKey: String, val category: ServiceCategory)
+data class ServiceInfo(
+    val displayName: String,
+    val rustKey: String,
+    val category: ServiceCategory,
+    // Countries (lowercase abbrev) this service is available in. Null/empty means
+    // it's available everywhere (e.g. international wallets, card networks).
+    val countries: List<String>? = null
+)
+
 private fun avatarColorFor(key: String): Color {
     val palette = listOf(
         Color(0xFF6750A4), Color(0xFF386A20), Color(0xFFB3261E),
@@ -54,11 +70,42 @@ private fun avatarColorFor(key: String): Color {
     return palette[key.hashCode().mod(palette.size)]
 }
 
+/**
+ * Validates the raw identifier the user typed for a given category/country combo.
+ * Returns null when valid, or a short user-facing error message when invalid.
+ */
+private fun identifierError(category: ServiceCategory?, value: String, country: CountryInfo): String? {
+    if (category == null) return null
+    return when (category) {
+        ServiceCategory.MOBILE_MONEY -> when {
+            value.isEmpty() -> "Enter a phone number"
+            value.length < country.mobileLength -> "Needs ${country.mobileLength} digits (${country.mobileLength - value.length} more)"
+            value.length > country.mobileLength -> "Too many digits — ${country.mobileLength} expected for ${country.name}"
+            else -> null
+        }
+        ServiceCategory.BANK -> when {
+            value.isEmpty() -> "Enter an account number"
+            value.length < 6 -> "Account numbers are usually at least 6 digits"
+            value.length > 20 -> "That's longer than a typical account number"
+            else -> null
+        }
+        ServiceCategory.CARD -> when {
+            value.isEmpty() -> "Enter the last 4 digits"
+            value.length < 4 -> "Needs 4 digits (${4 - value.length} more)"
+            else -> null
+        }
+        ServiceCategory.WALLET, ServiceCategory.PAYMENT -> when {
+            value.isBlank() -> "Enter an ID, username, or number"
+            value.trim().length < 3 -> "Too short"
+            else -> null
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddServiceScreen(navController: NavController) {
     val context = LocalContext.current
-
 
     // 1. Load the JSON immediately (from cache or assets)
     var rawJsonString by remember { mutableStateOf(ConfigManager.getLocalConfig(context)) }
@@ -81,7 +128,8 @@ fun AddServiceScreen(navController: NavController) {
                 CountryInfo(
                     name = cObj.getString("name"),
                     code = cObj.getString("code"),
-                    abbrev = cObj.getString("abbrev")
+                    abbrev = cObj.getString("abbrev"),
+                    mobileLength = cObj.optInt("mobileLength", 9)
                 )
             }
 
@@ -94,10 +142,14 @@ fun AddServiceScreen(navController: NavController) {
                 } catch (e: Exception) {
                     ServiceCategory.MOBILE_MONEY // Fallback safely if enum name mismatches
                 }
+                val countriesForService = sObj.optJSONArray("countries")?.let { arr ->
+                    List(arr.length()) { j -> arr.getString(j) }
+                }
                 ServiceInfo(
                     displayName = sObj.getString("displayName"),
                     rustKey = sObj.getString("rustKey"),
-                    category = categoryEnum
+                    category = categoryEnum,
+                    countries = countriesForService
                 )
             }
 
@@ -109,41 +161,6 @@ fun AddServiceScreen(navController: NavController) {
         }
     }
 
-//    val countries = listOf(
-//        CountryInfo("Tanzania", "+255", "tz"),
-//        CountryInfo("Kenya", "+254", "ke"),
-//        CountryInfo("Uganda", "+256", "ug"),
-//        CountryInfo("Rwanda", "+250", "rw"),
-//        CountryInfo("Ethiopia", "+251", "et"),
-//        CountryInfo("Zambia", "+260", "zm"),
-//        CountryInfo("Mozambique", "+258", "mz"),
-//        CountryInfo("Malawi", "+265", "mw"),
-//        CountryInfo("Ghana", "+233", "gh"),
-//        CountryInfo("Nigeria", "+234", "ng"),
-//        CountryInfo("South Africa", "+27", "za"),
-//        CountryInfo("Cameroon", "+237", "cm"),
-//        CountryInfo("Senegal", "+221", "sn"),
-//        CountryInfo("Ivory Coast", "+225", "ci"),
-//        CountryInfo("DRC", "+243", "cd")
-//    )
-//
-//    val availableServices = listOf(
-//        ServiceInfo("M-Pesa", "mpesa", ServiceCategory.MOBILE_MONEY),
-//        ServiceInfo("Airtel Money", "airtelmoney", ServiceCategory.MOBILE_MONEY),
-//        ServiceInfo("Mixx By Yas (TigoPesa)", "tigopesa", ServiceCategory.MOBILE_MONEY),
-//        ServiceInfo("HaloPesa", "halopesa", ServiceCategory.MOBILE_MONEY),
-//        ServiceInfo("MTN Mobile Money", "mtnmomo", ServiceCategory.MOBILE_MONEY),
-//        ServiceInfo("CRDB SimBanking", "crdbsimbanking", ServiceCategory.BANK),
-//        ServiceInfo("NMB Mkononi", "nmbmklik", ServiceCategory.BANK),
-//        ServiceInfo("NBC Kiganjani", "nbckiganjani", ServiceCategory.BANK),
-//        ServiceInfo("Equity Bank", "equitybank", ServiceCategory.BANK),
-//        ServiceInfo("KCB M-Pesa", "kcbmpesa", ServiceCategory.BANK),
-//        ServiceInfo("Generic ATM Card", "atmcard", ServiceCategory.CARD),
-//        ServiceInfo("Wave Wallet", "wave", ServiceCategory.WALLET),
-//        ServiceInfo("Selcom Pay", "selcom", ServiceCategory.WALLET),
-//        ServiceInfo("Nala App", "nala", ServiceCategory.WALLET)
-//    )
-
     // Initialize as nullable so it doesn't crash if lists are processing
     var selectedCountry by remember { mutableStateOf<CountryInfo?>(null) }
 
@@ -153,7 +170,7 @@ fun AddServiceScreen(navController: NavController) {
     }
 
     // A safe handle to reference throughout the UI layout
-    val activeCountry = selectedCountry ?: CountryInfo("Tanzania", "+255", "tz")
+    val activeCountry = selectedCountry ?: CountryInfo("Tanzania", "+255", "tz", 9)
 
     var personalNumber by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<ServiceCategory?>(null) }
@@ -165,8 +182,23 @@ fun AddServiceScreen(navController: NavController) {
 
     val isPhoneBased = selectedCategory == ServiceCategory.MOBILE_MONEY
     val fullIdentifier = if (isPhoneBased) "${activeCountry.code}$personalNumber" else personalNumber
-    val filteredServices = availableServices.filter { it.category == selectedCategory }
-    val canSave = personalNumber.isNotBlank() && selectedService != null
+
+    // Scope the provider list to the selected country. Global services (countries == null)
+    // always show; country-specific ones only show when they list the active country.
+    val filteredServices = availableServices.filter { service ->
+        service.category == selectedCategory &&
+                (service.countries.isNullOrEmpty() || service.countries.contains(activeCountry.abbrev))
+    }
+
+    // Clear a previously chosen provider if it's no longer valid for the current country/category
+    LaunchedEffect(selectedCategory, activeCountry) {
+        if (selectedService != null && selectedService !in filteredServices) {
+            selectedService = null
+        }
+    }
+
+    val validationError = identifierError(selectedCategory, personalNumber, activeCountry)
+    val canSave = selectedService != null && validationError == null
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Link New Service") }) }
@@ -262,6 +294,7 @@ fun AddServiceScreen(navController: NavController) {
                             ServiceCategory.BANK -> "Account Number"
                             ServiceCategory.CARD -> "Card Last 4 Digits"
                             ServiceCategory.WALLET -> "Wallet ID / Username"
+                            ServiceCategory.PAYMENT -> "Account / Merchant ID"
                             null -> ""
                         },
                         style = MaterialTheme.typography.titleSmall,
@@ -290,13 +323,17 @@ fun AddServiceScreen(navController: NavController) {
                                 )
                                 DropdownMenu(
                                     expanded = countryExpanded,
-                                    onDismissRequest = { countryExpanded = false }
+                                    onDismissRequest = { countryExpanded = false },
+                                    modifier = Modifier.heightIn(max = 320.dp)
                                 ) {
                                     countries.forEach { country ->
                                         DropdownMenuItem(
                                             text = { Text("${country.name} (${country.code})") },
                                             onClick = {
                                                 selectedCountry = country
+                                                // Number was valid for the old country; force re-entry so
+                                                // the length constraint is re-validated against the new one.
+                                                personalNumber = ""
                                                 countryExpanded = false
                                             }
                                         )
@@ -312,16 +349,29 @@ fun AddServiceScreen(navController: NavController) {
                                     ServiceCategory.CARD -> input.filter { it.isDigit() }.take(4)
                                     ServiceCategory.MOBILE_MONEY -> {
                                         val clean = input.filter { it.isDigit() }
-                                        when {
+                                        val stripped = when {
                                             clean.startsWith(activeCountry.code.removePrefix("+")) ->
                                                 clean.removePrefix(activeCountry.code.removePrefix("+"))
                                             clean.startsWith("0") -> clean.removePrefix("0")
                                             else -> clean
                                         }
+                                        stripped.take(activeCountry.mobileLength)
                                     }
-                                    ServiceCategory.BANK -> input.filter { it.isDigit() }
-                                    ServiceCategory.WALLET -> input
+                                    ServiceCategory.BANK -> input.filter { it.isDigit() }.take(20)
+                                    ServiceCategory.WALLET, ServiceCategory.PAYMENT -> input
                                     null -> input
+                                }
+                            },
+                            isError = personalNumber.isNotEmpty() && validationError != null,
+                            supportingText = {
+                                when {
+                                    validationError != null && personalNumber.isNotEmpty() ->
+                                        Text(validationError, color = MaterialTheme.colorScheme.error)
+                                    selectedCategory == ServiceCategory.MOBILE_MONEY ->
+                                        Text("${activeCountry.name}: ${activeCountry.mobileLength} digits, no leading 0")
+                                    selectedCategory == ServiceCategory.CARD ->
+                                        Text("Last 4 digits of the card number only — never the CVV or full number")
+                                    else -> {}
                                 }
                             },
                             label = {
@@ -329,6 +379,7 @@ fun AddServiceScreen(navController: NavController) {
                                     when (selectedCategory) {
                                         ServiceCategory.CARD -> "Last 4 digits"
                                         ServiceCategory.WALLET -> "Username / ID"
+                                        ServiceCategory.PAYMENT -> "Account / ID"
                                         else -> "Number"
                                     }
                                 )
@@ -336,16 +387,20 @@ fun AddServiceScreen(navController: NavController) {
                             placeholder = {
                                 Text(
                                     when (selectedCategory) {
-                                        ServiceCategory.MOBILE_MONEY -> "712345678"
+                                        ServiceCategory.MOBILE_MONEY -> "7XXXXXXXX".take(activeCountry.mobileLength)
                                         ServiceCategory.BANK -> "0123456789"
                                         ServiceCategory.CARD -> "1234"
                                         ServiceCategory.WALLET -> "your_username"
+                                        ServiceCategory.PAYMENT -> "merchant_id or account"
                                         null -> ""
                                     }
                                 )
                             },
                             keyboardOptions = KeyboardOptions(
-                                keyboardType = if (selectedCategory == ServiceCategory.WALLET) KeyboardType.Text else KeyboardType.Number
+                                keyboardType = when (selectedCategory) {
+                                    ServiceCategory.WALLET, ServiceCategory.PAYMENT -> KeyboardType.Text
+                                    else -> KeyboardType.Number
+                                }
                             ),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
@@ -360,7 +415,13 @@ fun AddServiceScreen(navController: NavController) {
                             value = selectedService?.displayName ?: "",
                             onValueChange = {},
                             readOnly = true,
-                            placeholder = { Text("Choose a service...") },
+                            placeholder = {
+                                Text(
+                                    if (filteredServices.isEmpty())
+                                        "No providers yet for ${activeCountry.name}"
+                                    else "Choose a service..."
+                                )
+                            },
                             leadingIcon = {
                                 if (selectedService != null) {
                                     Box(
@@ -380,12 +441,13 @@ fun AddServiceScreen(navController: NavController) {
                             trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
-                            singleLine = true
+                            singleLine = true,
+                            enabled = filteredServices.isNotEmpty()
                         )
                         Box(
                             modifier = Modifier
                                 .matchParentSize()
-                                .clickable { serviceExpanded = true }
+                                .clickable(enabled = filteredServices.isNotEmpty()) { serviceExpanded = true }
                         )
                         DropdownMenu(
                             expanded = serviceExpanded,
@@ -522,7 +584,7 @@ fun AddServiceScreen(navController: NavController) {
                                 identifier = fullIdentifier,
                                 pinLength = pinLength,
                                 displayName = service.displayName,
-                                category = activeCountry!!.name
+                                category = service.category.name
                             )
 
                             PendingServiceHolder.pending = finalConfig
