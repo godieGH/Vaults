@@ -176,6 +176,8 @@ class MainActivity : FragmentActivity() {
                     composable(route = "lifecycle_rotation") {
                         LifecycleRotationScreen(navController = navController)
                     }
+
+                    composable("new_service_pin") { NewServicePinScreen(navController) }
                 }
 
             }

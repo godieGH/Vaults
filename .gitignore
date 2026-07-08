@@ -12,6 +12,9 @@ app/build/
 captures/
 .externalNativeBuild/
 .cxx/
+app/release/
+*.jks
+*.keystore
 
 # Kotlin / Java
 *.class

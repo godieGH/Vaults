@@ -82,7 +82,7 @@ fun AddServiceScreen(navController: NavController) {
         ServiceInfo("HaloPesa", "halopesa", ServiceCategory.MOBILE_MONEY),
         ServiceInfo("MTN Mobile Money", "mtnmomo", ServiceCategory.MOBILE_MONEY),
         ServiceInfo("CRDB SimBanking", "crdbsimbanking", ServiceCategory.BANK),
-        ServiceInfo("NMB Mkonjani", "nmbmklik", ServiceCategory.BANK),
+        ServiceInfo("NMB Mkononi", "nmbmklik", ServiceCategory.BANK),
         ServiceInfo("NBC Kiganjani", "nbckiganjani", ServiceCategory.BANK),
         ServiceInfo("Equity Bank", "equitybank", ServiceCategory.BANK),
         ServiceInfo("KCB M-Pesa", "kcbmpesa", ServiceCategory.BANK),
@@ -463,11 +463,8 @@ fun AddServiceScreen(navController: NavController) {
                                 category = selectedCategory!!.name
                             )
 
-                            val currentServices = VaultsStorage.loadServices(context).toMutableList()
-                            currentServices.add(finalConfig)
-                            VaultsStorage.saveServices(context, currentServices)
-                            VaultsStorage.markAutoSyncDirty(context)
-                            navController.popBackStack()
+                            PendingServiceHolder.pending = finalConfig
+                            navController.navigate("new_service_pin")
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(14.dp),

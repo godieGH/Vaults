@@ -79,7 +79,7 @@ fun HomeScreen(
     var showBatchDeleteDialog by remember { mutableStateOf(false) }
 
     var searchQuery by remember { mutableStateOf("") }
-    var sortOption by remember { mutableStateOf(SortOption.NAME_AZ) }
+    var sortOption by remember { mutableStateOf(SortOption.RECENT) }
     var showSortMenu by remember { mutableStateOf(false) }
     var viewMode by remember {
         mutableStateOf(
@@ -623,9 +623,9 @@ fun ServiceRowItem(
                 )
                 Text(
                     text = when (service.category) {
-                        "MOBILE_MONEY" -> "${service.countryCode.uppercase()} ${service.identifier}"
+                        "MOBILE_MONEY" -> "${service.identifier}"
                         "BANK" -> "Acc: ${service.identifier}"
-                        "CARD" -> "•••• ${service.identifier}"
+                        "CARD" -> "****${service.identifier}"
                         "WALLET" -> "@${service.identifier}"
                         else -> service.identifier
                     },
@@ -738,9 +738,9 @@ private fun ServiceGridItem(
             )
             Text(
                 text = when (service.category) {
-                    "MOBILE_MONEY" -> "${service.countryCode.uppercase()} ${service.identifier}"
+                    "MOBILE_MONEY" -> "${service.identifier}"
                     "BANK" -> "Acc: ${service.identifier}"
-                    "CARD" -> "•••• ${service.identifier}"
+                    "CARD" -> "****${service.identifier}"
                     "WALLET" -> "@${service.identifier}"
                     else -> service.identifier
                 },
