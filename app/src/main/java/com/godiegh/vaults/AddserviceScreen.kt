@@ -3,10 +3,12 @@ package com.godiegh.vaults
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,8 +36,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 
 data class CountryInfo(
@@ -41,7 +48,6 @@ data class CountryInfo(
     val code: String,
     val abbrev: String,
     // National subscriber-number length (digits typed after removing a leading 0 or the country code).
-    // Used to validate mobile money numbers. Defaults to 9 if a country entry omits it.
     val mobileLength: Int = 9
 )
 
@@ -57,8 +63,7 @@ data class ServiceInfo(
     val displayName: String,
     val rustKey: String,
     val category: ServiceCategory,
-    // Countries (lowercase abbrev) this service is available in. Null/empty means
-    // it's available everywhere (e.g. international wallets, card networks).
+    // Countries (lowercase abbrev) this service is available in. Null/empty means global.
     val countries: List<String>? = null
 )
 
@@ -68,6 +73,18 @@ private fun avatarColorFor(key: String): Color {
         Color(0xFF00696D), Color(0xFF8E4EC6), Color(0xFF9C4146)
     )
     return palette[key.hashCode().mod(palette.size)]
+}
+
+/** Converts a 2-letter country abbreviation (e.g. "tz") into a flag emoji. */
+private fun countryFlagEmoji(abbrev: String): String {
+    if (abbrev.length != 2) return "🏳️"
+    val base = 0x1F1E6
+    val a = abbrev[0].uppercaseChar()
+    val b = abbrev[1].uppercaseChar()
+    if (a !in 'A'..'Z' || b !in 'A'..'Z') return "🏳️"
+    val first = base + (a - 'A')
+    val second = base + (b - 'A')
+    return String(Character.toChars(first)) + String(Character.toChars(second))
 }
 
 /**
@@ -80,7 +97,7 @@ private fun identifierError(category: ServiceCategory?, value: String, country: 
         ServiceCategory.MOBILE_MONEY -> when {
             value.isEmpty() -> "Enter a phone number"
             value.length < country.mobileLength -> "Needs ${country.mobileLength} digits (${country.mobileLength - value.length} more)"
-            value.length > country.mobileLength -> "Too many digits — ${country.mobileLength} expected for ${country.name}"
+            value.length > country.mobileLength -> "Too many digits for ${country.name}"
             else -> null
         }
         ServiceCategory.BANK -> when {
@@ -102,6 +119,111 @@ private fun identifierError(category: ServiceCategory?, value: String, country: 
     }
 }
 
+/**
+ * Responsive category picker. Always a single row of equally-sized chips so it never
+ * looks lopsided. On narrow screens each chip shows only its icon; once there's enough
+ * width for every chip to comfortably fit an icon + label, labels appear too.
+ */
+@Composable
+private fun CategoryPicker(selected: ServiceCategory?, onSelect: (ServiceCategory) -> Unit) {
+    val chipWidthForLabel = 96.dp
+    val spacing = 8.dp
+    val count = ServiceCategory.entries.size
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val neededForLabels = chipWidthForLabel * count + spacing * (count - 1)
+        val showLabels = maxWidth >= neededForLabels
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing)
+        ) {
+            ServiceCategory.entries.forEach { category ->
+                val isSelected = category == selected
+                val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(if (showLabels) 68.dp else 56.dp)
+                        .clickable { onSelect(category) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = bg
+                ) {
+                    if (showLabels) {
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(category.icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                category.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = fg
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(category.icon, contentDescription = category.label, tint = fg, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A generic full-screen searchable list dialog, used for both country and provider pickers. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> FullScreenSelectorDialog(
+    title: String,
+    items: List<T>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    itemKey: (T) -> Any,
+    itemContent: @Composable (T) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Close")
+                        }
+                    }
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search...") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
+                )
+                if (items.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("No results", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(items, key = itemKey) { item -> itemContent(item) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddServiceScreen(navController: NavController) {
@@ -113,7 +235,6 @@ fun AddServiceScreen(navController: NavController) {
     // 2. Try to sync with GitHub in the background
     LaunchedEffect(Unit) {
         ConfigManager.syncWithGitHub(context)
-        // Optionally update the UI immediately if the download succeeds while they are on this screen
         rawJsonString = ConfigManager.getLocalConfig(context)
     }
 
@@ -121,7 +242,6 @@ fun AddServiceScreen(navController: NavController) {
         try {
             val jsonObject = org.json.JSONObject(rawJsonString)
 
-            // 1. Parse Countries
             val countriesArray = jsonObject.getJSONArray("countries")
             val parsedCountries = List(countriesArray.length()) { i ->
                 val cObj = countriesArray.getJSONObject(i)
@@ -133,14 +253,13 @@ fun AddServiceScreen(navController: NavController) {
                 )
             }
 
-            // 2. Parse Services
             val servicesArray = jsonObject.getJSONArray("services")
             val parsedServices = List(servicesArray.length()) { i ->
                 val sObj = servicesArray.getJSONObject(i)
                 val categoryEnum = try {
                     ServiceCategory.valueOf(sObj.getString("category"))
                 } catch (e: Exception) {
-                    ServiceCategory.MOBILE_MONEY // Fallback safely if enum name mismatches
+                    ServiceCategory.MOBILE_MONEY
                 }
                 val countriesForService = sObj.optJSONArray("countries")?.let { arr ->
                     List(arr.length()) { j -> arr.getString(j) }
@@ -156,20 +275,14 @@ fun AddServiceScreen(navController: NavController) {
             Pair(parsedCountries, parsedServices)
         } catch (e: Exception) {
             e.printStackTrace()
-            // Fail-safe defaults to keep the app from crashing if JSON format breaks
             Pair(emptyList<CountryInfo>(), emptyList<ServiceInfo>())
         }
     }
 
-    // Initialize as nullable so it doesn't crash if lists are processing
     var selectedCountry by remember { mutableStateOf<CountryInfo?>(null) }
-
-    // Auto-select the first country once the parsed list is populated
     if (selectedCountry == null && countries.isNotEmpty()) {
         selectedCountry = countries[0]
     }
-
-    // A safe handle to reference throughout the UI layout
     val activeCountry = selectedCountry ?: CountryInfo("Tanzania", "+255", "tz", 9)
 
     var personalNumber by remember { mutableStateOf("") }
@@ -177,20 +290,20 @@ fun AddServiceScreen(navController: NavController) {
     var selectedService by remember { mutableStateOf<ServiceInfo?>(null) }
     var pinLength by remember { mutableStateOf(4) }
 
-    var countryExpanded by remember { mutableStateOf(false) }
-    var serviceExpanded by remember { mutableStateOf(false) }
+    var showCountryDialog by remember { mutableStateOf(false) }
+    var showServiceDialog by remember { mutableStateOf(false) }
+    var countryQuery by remember { mutableStateOf("") }
+    var serviceQuery by remember { mutableStateOf("") }
 
     val isPhoneBased = selectedCategory == ServiceCategory.MOBILE_MONEY
     val fullIdentifier = if (isPhoneBased) "${activeCountry.code}$personalNumber" else personalNumber
 
-    // Scope the provider list to the selected country. Global services (countries == null)
-    // always show; country-specific ones only show when they list the active country.
+    // Scope providers to the selected country. Global services (countries == null) always show.
     val filteredServices = availableServices.filter { service ->
         service.category == selectedCategory &&
                 (service.countries.isNullOrEmpty() || service.countries.contains(activeCountry.abbrev))
     }
 
-    // Clear a previously chosen provider if it's no longer valid for the current country/category
     LaunchedEffect(selectedCategory, activeCountry) {
         if (selectedService != null && selectedService !in filteredServices) {
             selectedService = null
@@ -200,6 +313,17 @@ fun AddServiceScreen(navController: NavController) {
     val validationError = identifierError(selectedCategory, personalNumber, activeCountry)
     val canSave = selectedService != null && validationError == null
 
+    val filteredCountries = remember(countries, countryQuery) {
+        if (countryQuery.isBlank()) countries
+        else countries.filter {
+            it.name.contains(countryQuery, ignoreCase = true) || it.code.contains(countryQuery)
+        }
+    }
+    val filteredServicesForDialog = remember(filteredServices, serviceQuery) {
+        if (serviceQuery.isBlank()) filteredServices
+        else filteredServices.filter { it.displayName.contains(serviceQuery, ignoreCase = true) }
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Link New Service") }) }
     ) { innerPadding ->
@@ -207,7 +331,7 @@ fun AddServiceScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .imePadding() // <--- Key addition for virtual screen keyboard responsiveness
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -228,59 +352,12 @@ fun AddServiceScreen(navController: NavController) {
                 )
             }
 
-            // --- CATEGORY PICKER ---
+            // --- CATEGORY PICKER (responsive, single row) ---
             Text("What are you linking?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val chunks = ServiceCategory.entries.chunked(2)
-                chunks.forEach { rowCategories ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        rowCategories.forEach { category ->
-                            val selected = category == selectedCategory
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(72.dp)
-                                    .clickable {
-                                        selectedCategory = category
-                                        selectedService = null
-                                        personalNumber = ""
-                                    },
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(
-                                        category.icon,
-                                        contentDescription = null,
-                                        tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Text(
-                                        category.label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                        if (rowCategories.size < 2) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
+            CategoryPicker(selected = selectedCategory) { category ->
+                selectedCategory = category
+                selectedService = null
+                personalNumber = ""
             }
 
             // --- REST OF FORM ---
@@ -302,42 +379,29 @@ fun AddServiceScreen(navController: NavController) {
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.Top,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (isPhoneBased) {
-                            Box(modifier = Modifier.width(120.dp)) {
-                                OutlinedTextField(
-                                    value = "${activeCountry.abbrev.uppercase()} ${activeCountry.code}",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    singleLine = true
-                                )
-                                Box(
+                            // Compact country trigger — sized to content, not stretched.
+                            Surface(
+                                modifier = Modifier
+                                    .height(56.dp)
+                                    .clickable { showCountryDialog = true },
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color.Transparent,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            ) {
+                                Row(
                                     modifier = Modifier
-                                        .matchParentSize()
-                                        .clickable { countryExpanded = true }
-                                )
-                                DropdownMenu(
-                                    expanded = countryExpanded,
-                                    onDismissRequest = { countryExpanded = false },
-                                    modifier = Modifier.heightIn(max = 320.dp)
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    countries.forEach { country ->
-                                        DropdownMenuItem(
-                                            text = { Text("${country.name} (${country.code})") },
-                                            onClick = {
-                                                selectedCountry = country
-                                                // Number was valid for the old country; force re-entry so
-                                                // the length constraint is re-validated against the new one.
-                                                personalNumber = ""
-                                                countryExpanded = false
-                                            }
-                                        )
-                                    }
+                                    Text(countryFlagEmoji(activeCountry.abbrev), fontSize = 18.sp)
+                                    Text(activeCountry.code, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
@@ -364,14 +428,10 @@ fun AddServiceScreen(navController: NavController) {
                             },
                             isError = personalNumber.isNotEmpty() && validationError != null,
                             supportingText = {
-                                when {
-                                    validationError != null && personalNumber.isNotEmpty() ->
-                                        Text(validationError, color = MaterialTheme.colorScheme.error)
-                                    selectedCategory == ServiceCategory.MOBILE_MONEY ->
-                                        Text("${activeCountry.name}: ${activeCountry.mobileLength} digits, no leading 0")
-                                    selectedCategory == ServiceCategory.CARD ->
-                                        Text("Last 4 digits of the card number only — never the CVV or full number")
-                                    else -> {}
+                                if (validationError != null && personalNumber.isNotEmpty()) {
+                                    Text(validationError, color = MaterialTheme.colorScheme.error)
+                                } else if (selectedCategory == ServiceCategory.CARD) {
+                                    Text("Last 4 digits of the card number only — never the CVV or full number")
                                 }
                             },
                             label = {
@@ -410,78 +470,43 @@ fun AddServiceScreen(navController: NavController) {
 
                     // --- SERVICE PROVIDER ---
                     Text("Service Provider", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = selectedService?.displayName ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            placeholder = {
-                                Text(
-                                    if (filteredServices.isEmpty())
-                                        "No providers yet for ${activeCountry.name}"
-                                    else "Choose a service..."
-                                )
-                            },
-                            leadingIcon = {
-                                if (selectedService != null) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .background(avatarColorFor(selectedService!!.rustKey), shape = CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            selectedService!!.displayName.take(1).uppercase(),
-                                            color = Color.White,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
-                                }
-                            },
-                            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            enabled = filteredServices.isNotEmpty()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .clickable(enabled = filteredServices.isNotEmpty()) { serviceExpanded = true }
-                        )
-                        DropdownMenu(
-                            expanded = serviceExpanded,
-                            onDismissRequest = { serviceExpanded = false },
-                            modifier = Modifier.heightIn(max = 320.dp)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clickable(enabled = filteredServices.isNotEmpty()) { showServiceDialog = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.Transparent,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            filteredServices.forEach { service ->
-                                DropdownMenuItem(
-                                    text = { Text(service.displayName) },
-                                    leadingIcon = {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .background(avatarColorFor(service.rustKey), shape = CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                service.displayName.take(1).uppercase(),
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.labelMedium
-                                            )
-                                        }
-                                    },
-                                    trailingIcon = {
-                                        if (service == selectedService) {
-                                            Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                    },
-                                    onClick = {
-                                        selectedService = service
-                                        serviceExpanded = false
-                                    }
-                                )
+                            if (selectedService != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .background(avatarColorFor(selectedService!!.rustKey), shape = CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        selectedService!!.displayName.take(1).uppercase(),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
                             }
+                            Text(
+                                selectedService?.displayName
+                                    ?: if (filteredServices.isEmpty()) "No providers yet for ${activeCountry.name}" else "Choose a service...",
+                                modifier = Modifier.weight(1f),
+                                color = if (selectedService == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                         }
                     }
 
@@ -600,6 +625,71 @@ fun AddServiceScreen(navController: NavController) {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        }
+    }
+
+    // --- FULL-SCREEN COUNTRY PICKER ---
+    if (showCountryDialog) {
+        FullScreenSelectorDialog(
+            title = "Choose a country",
+            items = filteredCountries,
+            query = countryQuery,
+            onQueryChange = { countryQuery = it },
+            onDismiss = { showCountryDialog = false; countryQuery = "" },
+            itemKey = { it.abbrev }
+        ) { country ->
+            ListItem(
+                headlineContent = { Text(country.name) },
+                supportingContent = { Text(country.code) },
+                leadingContent = { Text(countryFlagEmoji(country.abbrev), fontSize = 24.sp) },
+                trailingContent = {
+                    if (country.abbrev == activeCountry.abbrev) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                modifier = Modifier.clickable {
+                    selectedCountry = country
+                    personalNumber = "" // re-validate length against the new country
+                    showCountryDialog = false
+                    countryQuery = ""
+                }
+            )
+        }
+    }
+
+    // --- FULL-SCREEN SERVICE PROVIDER PICKER ---
+    if (showServiceDialog) {
+        FullScreenSelectorDialog(
+            title = "Choose a service provider",
+            items = filteredServicesForDialog,
+            query = serviceQuery,
+            onQueryChange = { serviceQuery = it },
+            onDismiss = { showServiceDialog = false; serviceQuery = "" },
+            itemKey = { it.rustKey }
+        ) { service ->
+            ListItem(
+                headlineContent = { Text(service.displayName) },
+                leadingContent = {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(avatarColorFor(service.rustKey), shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(service.displayName.take(1).uppercase(), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+                trailingContent = {
+                    if (service == selectedService) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                modifier = Modifier.clickable {
+                    selectedService = service
+                    showServiceDialog = false
+                    serviceQuery = ""
+                }
+            )
         }
     }
 }
