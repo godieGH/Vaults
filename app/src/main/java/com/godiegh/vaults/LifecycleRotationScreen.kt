@@ -84,8 +84,10 @@ fun LifecycleRotationScreen(navController: NavController) {
     // ── PROCESS DEATH DETECTION & SECURITY BOUNDARY ────────────────────────────
     // If the OS killed the process and restored the screen mid-way, the cryptographic keys
     // in RAM are missing. We reset state back to step 1 to maintain database safety.
+    // COMPLETE is excluded: by that point the migration is already committed and the keys
+    // are intentionally cleared, so an empty oldMasterKey there is expected, not a crash signal.
     LaunchedEffect(currentStep, oldMasterKey) {
-        if (currentStep != RotationStep.AUTHENTICATE && oldMasterKey.isEmpty()) {
+        if (currentStep != RotationStep.AUTHENTICATE && currentStep != RotationStep.COMPLETE && oldMasterKey.isEmpty()) {
             doneStatesList = List(services.size) { false }
             currentStep = RotationStep.AUTHENTICATE
             isLocked = false
@@ -328,7 +330,10 @@ fun LifecycleRotationScreen(navController: NavController) {
                                         )
                                     } else {
                                         IconButton(onClick = { confirmPassphraseVisible = !confirmPassphraseVisible }) {
-                                            Icon(if (confirmPassphraseVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, contentDescription = null)
+                                            Icon(
+                                                if (confirmPassphraseVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                                contentDescription = null
+                                            )
                                         }
                                     }
                                 },
