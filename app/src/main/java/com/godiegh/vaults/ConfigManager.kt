@@ -10,7 +10,7 @@ object ConfigManager {
 
     private const val FILE_NAME = "vaults_config.json"
     // Replace with your actual GitHub Raw URL
-    private const val GITHUB_RAW_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/vaults_config.json"
+    private const val GITHUB_RAW_URL = "https://raw.githubusercontent.com/godieGH/Vaults/refs/heads/main/app/src/main/assets/vaults_config.json"
 
     /**
      * Reads the JSON immediately.

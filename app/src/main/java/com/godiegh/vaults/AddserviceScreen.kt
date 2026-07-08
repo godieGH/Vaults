@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Wallet
@@ -40,7 +41,8 @@ enum class ServiceCategory(val label: String, val icon: ImageVector) {
     MOBILE_MONEY("Mobile Money", Icons.Filled.PhoneAndroid),
     BANK("Bank Account", Icons.Filled.AccountBalance),
     CARD("ATM / Card", Icons.Filled.CreditCard),
-    WALLET(label = "Wallet / Apps Services", Icons.Filled.Wallet)
+    WALLET("Wallet / Apps Services", Icons.Filled.Wallet),
+//    PAYMENT("Payment", Icons.Filled.Payment)
 }
 
 data class ServiceInfo(val displayName: String, val rustKey: String, val category: ServiceCategory)
@@ -57,42 +59,102 @@ private fun avatarColorFor(key: String): Color {
 fun AddServiceScreen(navController: NavController) {
     val context = LocalContext.current
 
-    val countries = listOf(
-        CountryInfo("Tanzania", "+255", "tz"),
-        CountryInfo("Kenya", "+254", "ke"),
-        CountryInfo("Uganda", "+256", "ug"),
-        CountryInfo("Rwanda", "+250", "rw"),
-        CountryInfo("Ethiopia", "+251", "et"),
-        CountryInfo("Zambia", "+260", "zm"),
-        CountryInfo("Mozambique", "+258", "mz"),
-        CountryInfo("Malawi", "+265", "mw"),
-        CountryInfo("Ghana", "+233", "gh"),
-        CountryInfo("Nigeria", "+234", "ng"),
-        CountryInfo("South Africa", "+27", "za"),
-        CountryInfo("Cameroon", "+237", "cm"),
-        CountryInfo("Senegal", "+221", "sn"),
-        CountryInfo("Ivory Coast", "+225", "ci"),
-        CountryInfo("DRC", "+243", "cd")
-    )
 
-    val availableServices = listOf(
-        ServiceInfo("M-Pesa", "mpesa", ServiceCategory.MOBILE_MONEY),
-        ServiceInfo("Airtel Money", "airtelmoney", ServiceCategory.MOBILE_MONEY),
-        ServiceInfo("Mixx By Yas (TigoPesa)", "tigopesa", ServiceCategory.MOBILE_MONEY),
-        ServiceInfo("HaloPesa", "halopesa", ServiceCategory.MOBILE_MONEY),
-        ServiceInfo("MTN Mobile Money", "mtnmomo", ServiceCategory.MOBILE_MONEY),
-        ServiceInfo("CRDB SimBanking", "crdbsimbanking", ServiceCategory.BANK),
-        ServiceInfo("NMB Mkononi", "nmbmklik", ServiceCategory.BANK),
-        ServiceInfo("NBC Kiganjani", "nbckiganjani", ServiceCategory.BANK),
-        ServiceInfo("Equity Bank", "equitybank", ServiceCategory.BANK),
-        ServiceInfo("KCB M-Pesa", "kcbmpesa", ServiceCategory.BANK),
-        ServiceInfo("Generic ATM Card", "atmcard", ServiceCategory.CARD),
-        ServiceInfo("Wave Wallet", "wave", ServiceCategory.WALLET),
-        ServiceInfo("Selcom Pay", "selcom", ServiceCategory.WALLET),
-        ServiceInfo("Nala App", "nala", ServiceCategory.WALLET)
-    )
+    // 1. Load the JSON immediately (from cache or assets)
+    var rawJsonString by remember { mutableStateOf(ConfigManager.getLocalConfig(context)) }
 
-    var selectedCountry by remember { mutableStateOf(countries[0]) }
+    // 2. Try to sync with GitHub in the background
+    LaunchedEffect(Unit) {
+        ConfigManager.syncWithGitHub(context)
+        // Optionally update the UI immediately if the download succeeds while they are on this screen
+        rawJsonString = ConfigManager.getLocalConfig(context)
+    }
+
+    val (countries, availableServices) = remember(rawJsonString) {
+        try {
+            val jsonObject = org.json.JSONObject(rawJsonString)
+
+            // 1. Parse Countries
+            val countriesArray = jsonObject.getJSONArray("countries")
+            val parsedCountries = List(countriesArray.length()) { i ->
+                val cObj = countriesArray.getJSONObject(i)
+                CountryInfo(
+                    name = cObj.getString("name"),
+                    code = cObj.getString("code"),
+                    abbrev = cObj.getString("abbrev")
+                )
+            }
+
+            // 2. Parse Services
+            val servicesArray = jsonObject.getJSONArray("services")
+            val parsedServices = List(servicesArray.length()) { i ->
+                val sObj = servicesArray.getJSONObject(i)
+                val categoryEnum = try {
+                    ServiceCategory.valueOf(sObj.getString("category"))
+                } catch (e: Exception) {
+                    ServiceCategory.MOBILE_MONEY // Fallback safely if enum name mismatches
+                }
+                ServiceInfo(
+                    displayName = sObj.getString("displayName"),
+                    rustKey = sObj.getString("rustKey"),
+                    category = categoryEnum
+                )
+            }
+
+            Pair(parsedCountries, parsedServices)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Fail-safe defaults to keep the app from crashing if JSON format breaks
+            Pair(emptyList<CountryInfo>(), emptyList<ServiceInfo>())
+        }
+    }
+
+//    val countries = listOf(
+//        CountryInfo("Tanzania", "+255", "tz"),
+//        CountryInfo("Kenya", "+254", "ke"),
+//        CountryInfo("Uganda", "+256", "ug"),
+//        CountryInfo("Rwanda", "+250", "rw"),
+//        CountryInfo("Ethiopia", "+251", "et"),
+//        CountryInfo("Zambia", "+260", "zm"),
+//        CountryInfo("Mozambique", "+258", "mz"),
+//        CountryInfo("Malawi", "+265", "mw"),
+//        CountryInfo("Ghana", "+233", "gh"),
+//        CountryInfo("Nigeria", "+234", "ng"),
+//        CountryInfo("South Africa", "+27", "za"),
+//        CountryInfo("Cameroon", "+237", "cm"),
+//        CountryInfo("Senegal", "+221", "sn"),
+//        CountryInfo("Ivory Coast", "+225", "ci"),
+//        CountryInfo("DRC", "+243", "cd")
+//    )
+//
+//    val availableServices = listOf(
+//        ServiceInfo("M-Pesa", "mpesa", ServiceCategory.MOBILE_MONEY),
+//        ServiceInfo("Airtel Money", "airtelmoney", ServiceCategory.MOBILE_MONEY),
+//        ServiceInfo("Mixx By Yas (TigoPesa)", "tigopesa", ServiceCategory.MOBILE_MONEY),
+//        ServiceInfo("HaloPesa", "halopesa", ServiceCategory.MOBILE_MONEY),
+//        ServiceInfo("MTN Mobile Money", "mtnmomo", ServiceCategory.MOBILE_MONEY),
+//        ServiceInfo("CRDB SimBanking", "crdbsimbanking", ServiceCategory.BANK),
+//        ServiceInfo("NMB Mkononi", "nmbmklik", ServiceCategory.BANK),
+//        ServiceInfo("NBC Kiganjani", "nbckiganjani", ServiceCategory.BANK),
+//        ServiceInfo("Equity Bank", "equitybank", ServiceCategory.BANK),
+//        ServiceInfo("KCB M-Pesa", "kcbmpesa", ServiceCategory.BANK),
+//        ServiceInfo("Generic ATM Card", "atmcard", ServiceCategory.CARD),
+//        ServiceInfo("Wave Wallet", "wave", ServiceCategory.WALLET),
+//        ServiceInfo("Selcom Pay", "selcom", ServiceCategory.WALLET),
+//        ServiceInfo("Nala App", "nala", ServiceCategory.WALLET)
+//    )
+
+    // Initialize as nullable so it doesn't crash if lists are processing
+    var selectedCountry by remember { mutableStateOf<CountryInfo?>(null) }
+
+    // Auto-select the first country once the parsed list is populated
+    if (selectedCountry == null && countries.isNotEmpty()) {
+        selectedCountry = countries[0]
+    }
+
+    // A safe handle to reference throughout the UI layout
+    val activeCountry = selectedCountry ?: CountryInfo("Tanzania", "+255", "tz")
+
     var personalNumber by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<ServiceCategory?>(null) }
     var selectedService by remember { mutableStateOf<ServiceInfo?>(null) }
@@ -102,7 +164,7 @@ fun AddServiceScreen(navController: NavController) {
     var serviceExpanded by remember { mutableStateOf(false) }
 
     val isPhoneBased = selectedCategory == ServiceCategory.MOBILE_MONEY
-    val fullIdentifier = if (isPhoneBased) "${selectedCountry.code}$personalNumber" else personalNumber
+    val fullIdentifier = if (isPhoneBased) "${activeCountry.code}$personalNumber" else personalNumber
     val filteredServices = availableServices.filter { it.category == selectedCategory }
     val canSave = personalNumber.isNotBlank() && selectedService != null
 
@@ -213,7 +275,7 @@ fun AddServiceScreen(navController: NavController) {
                         if (isPhoneBased) {
                             Box(modifier = Modifier.width(120.dp)) {
                                 OutlinedTextField(
-                                    value = "${selectedCountry.abbrev.uppercase()} ${selectedCountry.code}",
+                                    value = "${activeCountry.abbrev.uppercase()} ${activeCountry.code}",
                                     onValueChange = {},
                                     readOnly = true,
                                     trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
@@ -251,8 +313,8 @@ fun AddServiceScreen(navController: NavController) {
                                     ServiceCategory.MOBILE_MONEY -> {
                                         val clean = input.filter { it.isDigit() }
                                         when {
-                                            clean.startsWith(selectedCountry.code.removePrefix("+")) ->
-                                                clean.removePrefix(selectedCountry.code.removePrefix("+"))
+                                            clean.startsWith(activeCountry.code.removePrefix("+")) ->
+                                                clean.removePrefix(activeCountry.code.removePrefix("+"))
                                             clean.startsWith("0") -> clean.removePrefix("0")
                                             else -> clean
                                         }
@@ -456,11 +518,11 @@ fun AddServiceScreen(navController: NavController) {
                             val finalConfig = ServiceConfig(
                                 id = java.util.UUID.randomUUID().toString(),
                                 name = service.rustKey,
-                                countryCode = selectedCountry.abbrev,
+                                countryCode = activeCountry.abbrev,
                                 identifier = fullIdentifier,
                                 pinLength = pinLength,
                                 displayName = service.displayName,
-                                category = selectedCategory!!.name
+                                category = activeCountry!!.name
                             )
 
                             PendingServiceHolder.pending = finalConfig
