@@ -12,6 +12,7 @@ jna = "5.13.0"
 kotlinxCoroutines = "1.7.3"
 circularProgressBar = "3.1.0"
 workManager = "2.9.0"
+foundation = "1.11.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +35,7 @@ jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 circular-progressbar = { group = "com.mikhaellopez", name = "circularprogressbar", version.ref = "circularProgressBar" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

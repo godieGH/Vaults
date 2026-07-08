@@ -172,6 +172,10 @@ class MainActivity : FragmentActivity() {
                     composable(route = "restore_backup") {
                         RestoreBackupScreen(navController = navController)
                     }
+
+                    composable(route = "lifecycle_rotation") {
+                        LifecycleRotationScreen(navController = navController)
+                    }
                 }
 
             }

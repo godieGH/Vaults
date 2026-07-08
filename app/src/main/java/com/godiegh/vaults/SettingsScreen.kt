@@ -5,10 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -207,31 +210,41 @@ fun SettingsScreen(navController: NavController) {
 
             item {
                 Card(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info, // Requires androidx.compose.material.icons.Icons
-                            contentDescription = "Info",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                        Text(
-                            text = "Your passphrase can't be changed on its own — it's the actual\n" + "key that generates all your PINs, not a password we check\n" + "against. Changing it would produce entirely different PINs\n" + "that no longer match what's set at your bank or mobile money\n" + "provider.\n" + "\n" + "Resetting starts fresh: new passphrase, new salt, and you'll\n" + "need to re-register new PINs with each service afterward.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                            Text(
+                                text = "Your passphrase can't be changed on its own — it's the actual\n" + "key that generates all your PINs, not a password we check\n" + "against. Changing it would produce entirely different PINs\n" + "that no longer match what's set at your bank or mobile money\n" + "provider.\n" + "\n" + "Resetting starts fresh: new passphrase, new salt, and you'll\n" + "need to re-register new PINs with each service afterward.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { navController.navigate("lifecycle_rotation") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                        ) {
+                            Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Passphrase Compromised? \nRotate All PINs")
+                        }
                     }
                 }
+
             }
+
+
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
             item { HorizontalDivider() }
