@@ -65,6 +65,7 @@ fun RotatePinScreen(
         if (index != -1) {
             services[index] = services[index].copy(rotation = service.rotation + 1)
             VaultsStorage.saveServices(context, services)
+            VaultsStorage.markAutoSyncDirty(context)
         }
         rotationApplied = true
     }

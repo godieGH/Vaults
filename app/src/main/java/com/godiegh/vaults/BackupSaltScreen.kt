@@ -1,13 +1,25 @@
 package com.godiegh.vaults
 
+import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
@@ -29,6 +41,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
 import android.util.Base64
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -43,10 +59,11 @@ fun BackupSaltScreen(
     vm: BackupRestoreViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     var backupPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    
+
     val vmError by vm.errorMessage.collectAsState()
     var localErrorMessage by remember { mutableStateOf("") }
     val displayError = vmError.ifEmpty { localErrorMessage }
@@ -59,6 +76,61 @@ fun BackupSaltScreen(
     // State to hold the encrypted payload once generated
     var encryptedBackupPayload by remember { mutableStateOf<String?>(null) }
     var showRawText by remember { mutableStateOf(false) }
+
+    // --- Auto Sync state ---
+    // `autoSyncEnabled` mirrors the persisted truth (VaultsStorage). `showAutoSyncSetup`
+    // is purely local UI state for "the setup panel is open but not confirmed yet".
+    var autoSyncEnabled by remember { mutableStateOf(VaultsStorage.isAutoSyncEnabled(context)) }
+    var showAutoSyncSetup by remember { mutableStateOf(false) }
+    var driveConnectedEmail by remember { mutableStateOf(VaultsStorage.loadDriveAccountEmail(context)) }
+    var autoSyncPassword by remember { mutableStateOf("") }
+    var autoSyncConfirmPassword by remember { mutableStateOf("") }
+    var autoSyncErrorMessage by remember { mutableStateOf("") }
+    var isTestingConnection by remember { mutableStateOf(false) }
+    var connectionTestSuccess by remember { mutableStateOf<Boolean?>(null) }
+
+    fun resetAutoSyncSetupFields() {
+        autoSyncPassword = ""
+        autoSyncConfirmPassword = ""
+        autoSyncErrorMessage = ""
+    }
+
+    fun disableAutoSync() {
+        VaultsStorage.clearAutoSyncConfig(context)
+        SyncWorker.cancelPeriodic(context)
+        autoSyncEnabled = false
+        showAutoSyncSetup = false
+        driveConnectedEmail = null
+        resetAutoSyncSetupFields()
+    }
+
+    // Runs after Drive access is granted (whether that happened silently or via
+    // the account-picker PendingIntent): fetches a friendly email label off the
+    // main thread and persists the connection so it survives leaving this screen.
+    suspend fun completeDriveConnection(authResult: com.google.android.gms.auth.api.identity.AuthorizationResult) {
+        val token = authResult.accessToken
+        if (token == null) {
+            autoSyncErrorMessage = "Google Drive didn't return an access token. Please try again."
+            return
+        }
+        val email = withContext(Dispatchers.IO) {
+            val drive = GoogleDriveAuth.buildDriveService(token)
+            GoogleDriveAuth.fetchAccountEmail(drive)
+        }
+        driveConnectedEmail = email ?: "Google Drive connected"
+        VaultsStorage.saveDriveAccountEmail(context, driveConnectedEmail!!)
+    }
+
+    val driveAuthorizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val authResult = GoogleDriveAuth.resultFromIntent(context, result.data!!)
+            coroutineScope.launch { completeDriveConnection(authResult) }
+        } else {
+            autoSyncErrorMessage = "Google Drive connection was cancelled."
+        }
+    }
 
     // Security Feature: Wipe state when backgrounded (but not for our own picker/share sheet)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -83,6 +155,14 @@ fun BackupSaltScreen(
                 localErrorMessage = ""
                 vm.setErrorMessage("")
 
+                // Wipe any not-yet-confirmed auto-sync setup password too. If auto sync
+                // is already enabled, leave that config alone — only the in-progress
+                // setup fields are sensitive here.
+                autoSyncPassword = ""
+                autoSyncConfirmPassword = ""
+                autoSyncErrorMessage = ""
+                showAutoSyncSetup = false
+
             } else if (event == Lifecycle.Event.ON_RESUME) {
                 // 3. When app is active again, the navigation system is unlocked.
                 // We safely trigger the navigation here.
@@ -105,7 +185,7 @@ fun BackupSaltScreen(
 
     // Launcher for saving to device storage
     val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/plain")
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         isPickerActive = false
         uri?.let { destinationUri ->
@@ -129,7 +209,9 @@ fun BackupSaltScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .imePadding()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (encryptedBackupPayload == null) {
@@ -184,7 +266,7 @@ fun BackupSaltScreen(
                             backupObj.put("totp_secret", VaultsStorage.loadTotpSecret(context) ?: "")
                             backupObj.put("passphrase_fingerprint", VaultsStorage.loadFingerprint(context) ?: "")
                             backupObj.put("encrypted_passphrase", VaultsStorage.loadEncryptedPassphrase(context) ?: "")
-                            
+
                             val services = VaultsStorage.loadServices(context)
                             val servicesArray = JSONArray()
                             services.forEach { s ->
@@ -207,6 +289,354 @@ fun BackupSaltScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Encrypt Backup")
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // --- Auto Sync section ---
+                // This is independent of the manual export above: enabling it doesn't
+                // create a backup right now, it schedules future backups to happen
+                // automatically once the vault contents change.
+
+                var showManageBackups by remember { mutableStateOf(false) }
+                var cloudBackupsList by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
+                var isLoadingBackupsList by remember { mutableStateOf(false) }
+                var pendingDeleteFile by remember { mutableStateOf<com.google.api.services.drive.model.File?>(null) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto Sync", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Automatically back up future changes to your connected cloud drive.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = autoSyncEnabled || showAutoSyncSetup,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                if (!autoSyncEnabled) {
+                                    showAutoSyncSetup = true
+                                }
+                            } else {
+                                if (autoSyncEnabled) {
+                                    disableAutoSync()
+                                } else {
+                                    showAutoSyncSetup = false
+                                    resetAutoSyncSetupFields()
+                                }
+                            }
+                        }
+                    )
+                }
+
+                // Setup panel: shown while configuring, before auto sync is actually enabled.
+                AnimatedVisibility(
+                    visible = showAutoSyncSetup && !autoSyncEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        if (driveConnectedEmail == null) {
+                            OutlinedButton(
+                                onClick = {
+                                    autoSyncErrorMessage = ""
+                                    coroutineScope.launch {
+                                        try {
+                                            val authResult = GoogleDriveAuth.authorize(context)
+                                            if (authResult.hasResolution()) {
+                                                val pendingIntent = authResult.pendingIntent
+                                                if (pendingIntent != null) {
+                                                    driveAuthorizationLauncher.launch(
+                                                        IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                                                    )
+                                                }
+                                            } else {
+                                                completeDriveConnection(authResult)
+                                            }
+                                        } catch (e: Exception) {
+                                            autoSyncErrorMessage = "Couldn't connect to Google Drive: ${e.localizedMessage}"
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Filled.Cloud, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Connect Google Drive")
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.CloudDone,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    driveConnectedEmail ?: "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = {
+                                    val emailToRevoke = driveConnectedEmail
+                                    driveConnectedEmail = null
+                                    VaultsStorage.clearDriveAccountEmail(context)
+                                    if (emailToRevoke != null) {
+                                        coroutineScope.launch { GoogleDriveAuth.revokeAccess(context, emailToRevoke) }
+                                    }
+                                }) {
+                                    Text("Change")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                "Set a password to encrypt future auto-sync backups. This is separate " +
+                                        "from your manual backup password above, since the app needs to use " +
+                                        "it automatically in the background.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedTextField(
+                                value = autoSyncPassword,
+                                onValueChange = { autoSyncPassword = it; autoSyncErrorMessage = "" },
+                                label = { Text("Auto Sync Password") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = autoSyncConfirmPassword,
+                                onValueChange = { autoSyncConfirmPassword = it; autoSyncErrorMessage = "" },
+                                label = { Text("Confirm Auto Sync Password") },
+                                visualTransformation = PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            if (autoSyncErrorMessage.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    autoSyncErrorMessage,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    when {
+                                        autoSyncPassword.length < 6 ->
+                                            autoSyncErrorMessage = "Password must be at least 6 characters"
+                                        autoSyncPassword != autoSyncConfirmPassword ->
+                                            autoSyncErrorMessage = "Passwords do not match"
+                                        else -> {
+                                            VaultsStorage.enableAutoSync(
+                                                context,
+                                                autoSyncPassword,
+                                                driveConnectedEmail!!
+                                            )
+                                            autoSyncEnabled = true
+                                            showAutoSyncSetup = false
+                                            resetAutoSyncSetupFields()
+                                            SyncWorker.schedulePeriodic(context)
+                                            SyncWorker.enqueueImmediate(context)
+
+                                            // Schedule periodic backups and trigger the first one now
+                                            VaultsStorage.schedulePeriodicSync(context)
+                                            VaultsStorage.markAutoSyncDirty(context)
+                                            VaultsStorage.scheduleOneTimeSync(context)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Enable Auto Sync")
+                            }
+                        }
+                    }
+                }
+
+                // Status panel: shown once auto sync is actually enabled.
+                AnimatedVisibility(
+                    visible = autoSyncEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    "Auto sync is enabled",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    driveConnectedEmail ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(
+                                onClick = {
+                                    connectionTestSuccess = null
+                                    isTestingConnection = true
+                                    coroutineScope.launch {
+                                        connectionTestSuccess = try {
+                                            val authResult = GoogleDriveAuth.authorize(context)
+                                            val token = authResult.accessToken
+                                            if (token == null) {
+                                                false
+                                            } else {
+                                                withContext(Dispatchers.IO) {
+                                                    GoogleDriveAuth.testConnection(GoogleDriveAuth.buildDriveService(token))
+                                                }.isSuccess
+                                            }
+                                        } catch (e: Exception) {
+                                            false
+                                        } finally {
+                                            isTestingConnection = false
+                                        }
+                                    }
+                                },
+                                enabled = !isTestingConnection,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(if (isTestingConnection) "Testing..." else "Test Connection")
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            when (connectionTestSuccess) {
+                                true -> Icon(Icons.Filled.CheckCircle, contentDescription = "Connected", tint = MaterialTheme.colorScheme.primary)
+                                false -> Icon(Icons.Filled.Close, contentDescription = "Failed", tint = MaterialTheme.colorScheme.error)
+                                null -> {}
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                isLoadingBackupsList = true
+                                coroutineScope.launch {
+                                    try {
+                                        val token = GoogleDriveAuth.authorize(context).accessToken
+                                        if (token != null) {
+                                            val drive = GoogleDriveAuth.buildDriveService(token)
+                                            cloudBackupsList = withContext(Dispatchers.IO) { GoogleDriveAuth.listBackups(drive) }
+                                            showManageBackups = true
+                                        }
+                                    } finally {
+                                        isLoadingBackupsList = false
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(if (isLoadingBackupsList) "Loading..." else "Manage Cloud Backups")
+                        }
+
+                        if (showManageBackups) {
+                            AlertDialog(
+                                onDismissRequest = { showManageBackups = false },
+                                title = { Text("Cloud Backups") },
+                                text = {
+                                    if (cloudBackupsList.isEmpty()) {
+                                        Text("No backups found.")
+                                    } else {
+                                        LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                                            items(cloudBackupsList) { file ->
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(file.name ?: "Unknown", modifier = Modifier.weight(1f))
+                                                    IconButton(onClick = { pendingDeleteFile = file }) {
+                                                        Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = { showManageBackups = false }) { Text("Close") }
+                                }
+                            )
+                        }
+
+                        pendingDeleteFile?.let { file ->
+                            AlertDialog(
+                                onDismissRequest = { pendingDeleteFile = null },
+                                title = { Text("Move to Trash?") },
+                                text = { Text("\"${file.name}\" will be moved to your Google Drive trash and permanently removed after ~30 days. This can't be undone from within Vaults.") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        coroutineScope.launch {
+                                            val token = GoogleDriveAuth.authorize(context).accessToken
+                                            if (token != null) {
+                                                val drive = GoogleDriveAuth.buildDriveService(token)
+                                                val success = withContext(Dispatchers.IO) {
+                                                    GoogleDriveAuth.trashFile(drive, file.id ?: "")
+                                                }
+                                                if (success) {
+                                                    cloudBackupsList = cloudBackupsList.filter { it.id != file.id }
+                                                }
+                                            }
+                                            pendingDeleteFile = null
+                                        }
+                                    }) {
+                                        Text("Move to Trash", color = MaterialTheme.colorScheme.error)
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { pendingDeleteFile = null }) { Text("Cancel") }
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = { disableAutoSync() }) {
+                            Text("Disable Auto Sync", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             } else {
                 // STEP 2: Export Options
@@ -235,7 +665,7 @@ fun BackupSaltScreen(
                     onClick = {
                         if (!isPickerActive) {
                             isPickerActive = true // Set flag before opening picker
-                            createDocumentLauncher.launch("vaults_backup.txt")
+                            createDocumentLauncher.launch("vaults_backup.vbak")
                         }
                     },
                     enabled = !isPickerActive,

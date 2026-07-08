@@ -1,6 +1,11 @@
 // HomeScreen.kt
 package com.godiegh.vaults
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -17,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GridView
@@ -26,6 +33,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -79,6 +87,42 @@ fun HomeScreen(
         )
     }
 
+    // --- Auto Sync status (button lives in the top bar, next to Settings) ---
+    var autoSyncEnabled by remember { mutableStateOf(VaultsStorage.isAutoSyncEnabled(context)) }
+    var hasPendingAutoSyncChanges by remember { mutableStateOf(VaultsStorage.hasPendingAutoSyncChanges(context)) }
+    var hasInternet by remember { mutableStateOf(true) } // corrected immediately by the callback below
+
+    DisposableEffect(Unit) {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { hasInternet = true }
+            override fun onLost(network: Network) { hasInternet = false }
+            override fun onUnavailable() { hasInternet = false }
+        }
+        // Seed from the current active network instead of assuming we start online.
+        val activeCaps = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        hasInternet = activeCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        connectivityManager.registerNetworkCallback(request, callback)
+        onDispose { connectivityManager.unregisterNetworkCallback(callback) }
+    }
+
+    fun forceSyncNow() {
+        if (!hasInternet) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("No internet connection — will sync when you're back online")
+            }
+            return
+        }
+        hasPendingAutoSyncChanges = false
+        SyncWorker.enqueueImmediate(context)
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar("Sync started")
+        }
+    }
+
     fun toggleSelect(id: String) {
         selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
@@ -86,6 +130,13 @@ fun HomeScreen(
     fun persist(updated: List<ServiceConfig>) {
         savedServices = updated
         VaultsStorage.saveServices(context, updated)
+        // Any change to the saved services is exactly what auto sync exists to
+        // capture, so mark it dirty here rather than scattering this check across
+        // every call site that mutates services.
+        if (autoSyncEnabled) {
+            VaultsStorage.markAutoSyncDirty(context)
+            hasPendingAutoSyncChanges = true
+        }
     }
 
     fun requestDelete(service: ServiceConfig) {
@@ -129,6 +180,8 @@ fun HomeScreen(
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 savedServices = VaultsStorage.loadServices(context)
+                autoSyncEnabled = VaultsStorage.isAutoSyncEnabled(context)
+                hasPendingAutoSyncChanges = VaultsStorage.hasPendingAutoSyncChanges(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -175,6 +228,29 @@ fun HomeScreen(
                 TopAppBar(
                     title = {},
                     actions = {
+                        if (autoSyncEnabled) {
+                            val isOfflineWithPending = hasPendingAutoSyncChanges && !hasInternet
+                            val isReadyToSync = hasPendingAutoSyncChanges && hasInternet
+                            IconButton(onClick = { forceSyncNow() }) {
+                                Icon(
+                                    imageVector = when {
+                                        isOfflineWithPending -> Icons.Filled.CloudOff
+                                        isReadyToSync -> Icons.Filled.Sync
+                                        else -> Icons.Filled.CloudDone
+                                    },
+                                    contentDescription = when {
+                                        isOfflineWithPending -> "Auto sync waiting — no internet"
+                                        isReadyToSync -> "Changes pending — click to sync now"
+                                        else -> "Vault synced with cloud"
+                                    },
+                                    tint = when {
+                                        isOfflineWithPending -> MaterialTheme.colorScheme.error
+                                        isReadyToSync -> MaterialTheme.colorScheme.secondary
+                                        else -> MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                            }
+                        }
                         IconButton(onClick = { navController.navigate("settings") }) {
                             Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

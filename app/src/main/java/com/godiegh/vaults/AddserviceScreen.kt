@@ -113,6 +113,7 @@ fun AddServiceScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding() // <--- Key addition for virtual screen keyboard responsiveness
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -140,7 +141,6 @@ fun AddServiceScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Split entries into pairs of 2 rows
                 val chunks = ServiceCategory.entries.chunked(2)
                 chunks.forEach { rowCategories ->
                     Row(
@@ -151,8 +151,8 @@ fun AddServiceScreen(navController: NavController) {
                             val selected = category == selectedCategory
                             Surface(
                                 modifier = Modifier
-                                    .weight(1f) // Automatically splits width evenly 50/50
-                                    .height(72.dp) // Lower height since it's a grid cell
+                                    .weight(1f)
+                                    .height(72.dp)
                                     .clickable {
                                         selectedCategory = category
                                         selectedService = null
@@ -182,7 +182,6 @@ fun AddServiceScreen(navController: NavController) {
                                 }
                             }
                         }
-                        // If the last row has an odd number of elements, insert an empty box to maintain structure
                         if (rowCategories.size < 2) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
@@ -190,11 +189,11 @@ fun AddServiceScreen(navController: NavController) {
                 }
             }
 
-            // --- REST OF FORM: only shows once a category is picked ---
+            // --- REST OF FORM ---
             AnimatedVisibility(visible = selectedCategory != null, enter = fadeIn(), exit = fadeOut()) {
                 Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
 
-                    // --- IDENTIFIER ROW (phone / account / card / wallet) ---
+                    // --- IDENTIFIER ROW ---
                     Text(
                         when (selectedCategory) {
                             ServiceCategory.MOBILE_MONEY -> "Phone Number"
@@ -467,6 +466,7 @@ fun AddServiceScreen(navController: NavController) {
                             val currentServices = VaultsStorage.loadServices(context).toMutableList()
                             currentServices.add(finalConfig)
                             VaultsStorage.saveServices(context, currentServices)
+                            VaultsStorage.markAutoSyncDirty(context)
                             navController.popBackStack()
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),

@@ -5,6 +5,23 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import androidx.core.content.edit
+import android.util.Base64
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import org.json.JSONArray
+import org.json.JSONObject
+import java.security.SecureRandom
+import java.util.concurrent.TimeUnit
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
 
 object VaultsStorage {
 
@@ -171,5 +188,148 @@ object VaultsStorage {
 
     fun loadFingerprint(context: Context): String? {
         return getPrefs(context).getString(KEY_FINGERPRINT, null)
+    }
+
+    private const val KEY_AUTO_SYNC_ENABLED = "auto_sync_enabled"
+    private const val KEY_AUTO_SYNC_SALT = "auto_sync_salt"
+    private const val KEY_AUTO_SYNC_KEY_MATERIAL = "auto_sync_key_material"
+    private const val KEY_DRIVE_ACCOUNT_EMAIL = "drive_account_email"
+
+    fun isAutoSyncEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_AUTO_SYNC_ENABLED, false)
+    }
+
+    fun loadDriveAccountEmail(context: Context): String? {
+        return getPrefs(context).getString(KEY_DRIVE_ACCOUNT_EMAIL, null)
+    }
+
+    /**
+     * Derives an AES-256 key from the auto-sync password (same PBKDF2 params as
+     * the manual backup encryption) and persists salt + key material + the
+     * enabled flag + drive account email. EncryptedSharedPreferences already
+     * encrypts values at rest, so storing the derived key here (rather than the
+     * raw password) is what lets the background sync worker encrypt future
+     * backups without prompting the user each time.
+     */
+    fun enableAutoSync(context: Context, password: String, driveAccountEmail: String) {
+        val salt = ByteArray(16)
+        SecureRandom().nextBytes(salt)
+
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 256)
+        val derivedKey = factory.generateSecret(spec).encoded
+
+        getPrefs(context).edit {
+            putString(KEY_AUTO_SYNC_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
+            putString(KEY_AUTO_SYNC_KEY_MATERIAL, Base64.encodeToString(derivedKey, Base64.NO_WRAP))
+            putString(KEY_DRIVE_ACCOUNT_EMAIL, driveAccountEmail)
+            putBoolean(KEY_AUTO_SYNC_ENABLED, true)
+        }
+    }
+
+    /** Returns the derived AES key for the sync worker to use, or null if not configured. */
+    fun loadAutoSyncKey(context: Context): ByteArray? {
+        val str = getPrefs(context).getString(KEY_AUTO_SYNC_KEY_MATERIAL, null) ?: return null
+        return Base64.decode(str, Base64.NO_WRAP)
+    }
+
+    fun clearAutoSyncConfig(context: Context) {
+        getPrefs(context).edit {
+            remove(KEY_AUTO_SYNC_ENABLED)
+            remove(KEY_AUTO_SYNC_SALT)
+            remove(KEY_AUTO_SYNC_KEY_MATERIAL)
+            remove(KEY_DRIVE_ACCOUNT_EMAIL)
+        }
+    }
+
+    fun hasPendingAutoSyncChanges(context: Context): Boolean {
+        return getPrefs(context).getBoolean("auto_sync_pending", false)
+    }
+
+    fun markAutoSyncDirty(context: Context) {
+        getPrefs(context).edit { putBoolean("auto_sync_pending", true) }
+    }
+
+    fun markAutoSyncSynced(context: Context) {
+        getPrefs(context).edit { putBoolean("auto_sync_pending", false) }
+    }
+
+    fun saveDriveAccountEmail(context: Context, email: String) {
+        getPrefs(context).edit { putString(KEY_DRIVE_ACCOUNT_EMAIL, email) }
+    }
+
+    fun clearDriveAccountEmail(context: Context) {
+        getPrefs(context).edit { remove(KEY_DRIVE_ACCOUNT_EMAIL) }
+    }
+
+    // --- WorkManager scheduling helpers ---
+
+    private const val SYNC_WORK_NAME = "vaults_auto_sync"
+
+    fun schedulePeriodicSync(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = PeriodicWorkRequestBuilder<SyncWorker>(6, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            SYNC_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncRequest
+        )
+    }
+
+    fun scheduleOneTimeSync(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "vaults_manual_sync",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
+    }
+
+    fun cancelSync(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
+    }
+
+    /**
+     * Decrypts a backup payload specifically generated by the SyncWorker.
+     */
+    fun decryptAutoSyncBackup(payload: String, context: Context): String? {
+        if (!payload.startsWith("sync_v1:")) return null
+        val parts = payload.split(":")
+        if (parts.size != 3) return null
+
+        val keyMaterial = loadAutoSyncKey(context) ?: return null
+
+        return try {
+            val iv = Base64.decode(parts[1], Base64.NO_WRAP)
+            val ciphertext = Base64.decode(parts[2], Base64.NO_WRAP)
+
+            val secretKey = SecretKeySpec(keyMaterial, "AES")
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val gcmSpec = GCMParameterSpec(128, iv)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec)
+
+            val decrypted = cipher.doFinal(ciphertext)
+            String(decrypted, Charsets.UTF_8)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun loadAutoSyncSalt(context: Context): ByteArray? {
+        val str = getPrefs(context).getString(KEY_AUTO_SYNC_SALT, null) ?: return null
+        return Base64.decode(str, Base64.NO_WRAP)
     }
 }

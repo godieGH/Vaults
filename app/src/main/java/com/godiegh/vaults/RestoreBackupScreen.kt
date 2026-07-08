@@ -31,7 +31,15 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import androidx.lifecycle.viewmodel.compose.viewModel
-import uniffi.vaults.ffiGenerateTotpSecret
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Cloud
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.app.Activity
+import androidx.activity.result.IntentSenderRequest
+import com.google.android.gms.auth.api.identity.AuthorizationResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,12 +63,43 @@ fun RestoreBackupScreen(
     // Validation state
     val canAttemptRestore = backupPayload.isNotBlank() && backupPassword.isNotBlank()
 
+    var showCloudPicker by remember { mutableStateOf(false) }
+    var cloudBackups by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
+    var isLoadingCloudBackups by remember { mutableStateOf(false) }
+
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
             vm.loadBackupFromFile(context, it)
             localErrorMessage = ""
+        }
+    }
+
+    suspend fun loadCloudBackups(authResult: AuthorizationResult) {
+        val token = authResult.accessToken
+        if (token == null) {
+            localErrorMessage = "Google Drive didn't return an access token. Please try again."
+            return
+        }
+        val drive = GoogleDriveAuth.buildDriveService(token)
+        cloudBackups = withContext(Dispatchers.IO) { GoogleDriveAuth.listBackups(drive) }
+        showCloudPicker = true
+    }
+
+    val driveAuthorizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val authResult = GoogleDriveAuth.resultFromIntent(context, result.data!!)
+            coroutineScope.launch {
+                isLoadingCloudBackups = true
+                loadCloudBackups(authResult)
+                isLoadingCloudBackups = false
+            }
+        } else {
+            localErrorMessage = "Google Drive connection was cancelled."
+            isLoadingCloudBackups = false
         }
     }
 
@@ -126,6 +165,86 @@ fun RestoreBackupScreen(
                     Text("Load from File", style = MaterialTheme.typography.titleMedium)
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        isLoadingCloudBackups = true
+                        localErrorMessage = ""
+                        coroutineScope.launch {
+                            try {
+                                val authResult = GoogleDriveAuth.authorize(context)
+                                if (authResult.hasResolution()) {
+                                    val pendingIntent = authResult.pendingIntent
+                                    if (pendingIntent != null) {
+                                        driveAuthorizationLauncher.launch(
+                                            IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+                                        )
+                                    } else {
+                                        localErrorMessage = "Couldn't start Google Drive authorization."
+                                        isLoadingCloudBackups = false
+                                    }
+                                } else {
+                                    loadCloudBackups(authResult)
+                                    isLoadingCloudBackups = false
+                                }
+                            } catch (e: Exception) {
+                                localErrorMessage = "Couldn't connect to Google Drive: ${e.localizedMessage}"
+                                isLoadingCloudBackups = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Filled.Cloud, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isLoadingCloudBackups) "Loading..." else "Restore from Cloud", style = MaterialTheme.typography.titleMedium)
+                }
+
+                if (showCloudPicker) {
+                    AlertDialog(
+                        onDismissRequest = { showCloudPicker = false },
+                        title = { Text("Choose a Backup") },
+                        text = {
+                            if (cloudBackups.isEmpty()) {
+                                Text("No backups found in your connected Google Drive.")
+                            } else {
+                                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                                    items(cloudBackups) { file ->
+                                        Text(
+                                            text = file.name ?: "Unknown",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    showCloudPicker = false
+                                                    val fileId = file.id ?: return@clickable
+                                                    coroutineScope.launch {
+                                                        val token = GoogleDriveAuth.authorize(context).accessToken
+                                                        if (token != null) {
+                                                            val drive = GoogleDriveAuth.buildDriveService(token)
+                                                            val content = withContext(Dispatchers.IO) {
+                                                                GoogleDriveAuth.downloadFile(drive, fileId)
+                                                            }
+                                                            if (content != null) {
+                                                                vm.setBackupPayload(content)
+                                                            } else {
+                                                                localErrorMessage = "Failed to download backup."
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                .padding(vertical = 12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showCloudPicker = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedTextField(
@@ -181,8 +300,8 @@ fun RestoreBackupScreen(
                         val cleanPayload = backupPayload.trim()
 
                         // 1. Pre-flight format check
-                        if (!cleanPayload.startsWith("enc_v1:")) {
-                            localErrorMessage = "Invalid backup format. Data must start with 'enc_v1:'"
+                        if (!cleanPayload.startsWith("enc_v1:") && !cleanPayload.startsWith("sync_v1:")) {
+                            localErrorMessage = "Invalid backup format."
                             return@Button
                         }
 
@@ -253,15 +372,19 @@ fun RestoreBackupScreen(
  * Real AES-GCM decryption for the backup payload.
  */
 private fun decryptBackup(payload: String, password: String): String? {
-    if (!payload.startsWith("enc_v1:")) return null
-    
-    val parts = payload.split(":")
-    if (parts.size != 4) return null
-    
+    val prefix = when {
+        payload.startsWith("enc_v1:") -> "enc_v1:"
+        payload.startsWith("sync_v1:") -> "sync_v1:"
+        else -> return null
+    }
+
+    val parts = payload.removePrefix(prefix).split(":")
+    if (parts.size != 3) return null
+
     return try {
-        val salt = Base64.decode(parts[1], Base64.NO_WRAP)
-        val iv = Base64.decode(parts[2], Base64.NO_WRAP)
-        val ciphertext = Base64.decode(parts[3], Base64.NO_WRAP)
+        val salt = Base64.decode(parts[0], Base64.NO_WRAP)
+        val iv = Base64.decode(parts[1], Base64.NO_WRAP)
+        val ciphertext = Base64.decode(parts[2], Base64.NO_WRAP)
 
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 256)
