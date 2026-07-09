@@ -1,4 +1,3 @@
-
 package com.godiegh.vaults
 
 import android.content.Context
@@ -13,17 +12,84 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import org.json.JSONArray
-import org.json.JSONObject
+import android.os.Build
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import java.security.KeyStore
 import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object VaultsStorage {
+
+    // --- Keystore wrap key for the cached auto-sync key material ---
+    // This does NOT replace the password-derived key used to encrypt backup
+    // content (that must stay password-portable so a fresh device can restore).
+    // It only protects the on-device *cache* of that derived key from being
+    // lifted out of EncryptedSharedPreferences on a rooted/compromised device:
+    // the wrap key is hardware-backed and non-exportable, and (API 30+) can
+    // only be used while the device is unlocked.
+    private const val AUTOSYNC_WRAP_KEY_ALIAS = "com.godiegh.vaults.autosync_wrap_key"
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    private const val WRAP_TRANSFORMATION = "AES/GCM/NoPadding"
+
+    private fun getOrCreateAutoSyncWrapKey(): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        (keyStore.getKey(AUTOSYNC_WRAP_KEY_ALIAS, null) as? SecretKey)?.let { return it }
+
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        val builder = KeyGenParameterSpec.Builder(
+            AUTOSYNC_WRAP_KEY_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            // Deliberately NOT setUserAuthenticationRequired(true) — this key must be
+            // usable by a background WorkManager job with no user present.
+            .setUserAuthenticationRequired(false)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Requires the device to have been unlocked at least once since boot
+            // and not be in a "before first unlock" state. Background sync will
+            // simply retry later (SyncWorker already treats exceptions as retry).
+            builder.setUnlockedDeviceRequired(true)
+        }
+
+        keyGenerator.init(builder.build())
+        return keyGenerator.generateKey()
+    }
+
+    /** Wraps raw key bytes for at-rest storage. Format: ivB64:ciphertextB64 */
+    private fun wrapAutoSyncKeyMaterial(raw: ByteArray): String {
+        val cipher = Cipher.getInstance(WRAP_TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, getOrCreateAutoSyncWrapKey())
+        }
+        val ciphertext = cipher.doFinal(raw)
+        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" +
+                Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+    }
+
+    /** Reverses [wrapAutoSyncKeyMaterial]. Returns null if unavailable (e.g. device locked). */
+    private fun unwrapAutoSyncKeyMaterial(wrapped: String): ByteArray? {
+        return try {
+            val parts = wrapped.split(":")
+            if (parts.size != 2) return null
+            val iv = Base64.decode(parts[0], Base64.NO_WRAP)
+            val ciphertext = Base64.decode(parts[1], Base64.NO_WRAP)
+            val cipher = Cipher.getInstance(WRAP_TRANSFORMATION).apply {
+                init(Cipher.DECRYPT_MODE, getOrCreateAutoSyncWrapKey(), GCMParameterSpec(128, iv))
+            }
+            cipher.doFinal(ciphertext)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private const val PREFS_NAME = "vaults_secure_prefs"
     private const val KEY_SALT = "salt"
@@ -221,16 +287,21 @@ object VaultsStorage {
 
         getPrefs(context).edit {
             putString(KEY_AUTO_SYNC_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
-            putString(KEY_AUTO_SYNC_KEY_MATERIAL, Base64.encodeToString(derivedKey, Base64.NO_WRAP))
+            putString(KEY_AUTO_SYNC_KEY_MATERIAL, wrapAutoSyncKeyMaterial(derivedKey))
             putString(KEY_DRIVE_ACCOUNT_EMAIL, driveAccountEmail)
             putBoolean(KEY_AUTO_SYNC_ENABLED, true)
         }
     }
 
-    /** Returns the derived AES key for the sync worker to use, or null if not configured. */
+    /**
+     * Returns the derived AES key for the sync worker to use, or null if not configured
+     * or if the Keystore wrap key is currently unusable (e.g. device locked since boot
+     * on API 30+ with setUnlockedDeviceRequired). SyncWorker already treats a null/failed
+     * result as retryable.
+     */
     fun loadAutoSyncKey(context: Context): ByteArray? {
         val str = getPrefs(context).getString(KEY_AUTO_SYNC_KEY_MATERIAL, null) ?: return null
-        return Base64.decode(str, Base64.NO_WRAP)
+        return unwrapAutoSyncKeyMaterial(str)
     }
 
     fun clearAutoSyncConfig(context: Context) {
@@ -239,6 +310,12 @@ object VaultsStorage {
             remove(KEY_AUTO_SYNC_SALT)
             remove(KEY_AUTO_SYNC_KEY_MATERIAL)
             remove(KEY_DRIVE_ACCOUNT_EMAIL)
+        }
+        try {
+            KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+                .deleteEntry(AUTOSYNC_WRAP_KEY_ALIAS)
+        } catch (e: Exception) {
+            // best-effort cleanup
         }
     }
 
@@ -331,5 +408,39 @@ object VaultsStorage {
     fun loadAutoSyncSalt(context: Context): ByteArray? {
         val str = getPrefs(context).getString(KEY_AUTO_SYNC_SALT, null) ?: return null
         return Base64.decode(str, Base64.NO_WRAP)
+    }
+
+
+
+    // Inside VaultsStorage object
+
+    /**
+     * Packs the entire current state of the vault into a single JSON string.
+     * Reusable for manual exports, background auto-sync, or troubleshooting.
+     */
+    fun exportVaultAsJson(context: Context): String {
+        val backupObj = org.json.JSONObject()
+        backupObj.put("version", 1)
+        backupObj.put("salt", loadSalt(context)?.joinToString("") { "%02x".format(it) } ?: "")
+        backupObj.put("totp_secret", loadTotpSecret(context) ?: "")
+        backupObj.put("passphrase_fingerprint", loadFingerprint(context) ?: "")
+        backupObj.put("encrypted_passphrase", loadEncryptedPassphrase(context) ?: "")
+
+        val services = loadServices(context)
+        val servicesArray = org.json.JSONArray()
+        services.forEach { s ->
+            val obj = org.json.JSONObject()
+            obj.put("id", s.id)
+            obj.put("name", s.name)
+            obj.put("countryCode", s.countryCode)
+            obj.put("identifier", s.identifier)
+            obj.put("pinLength", s.pinLength)
+            obj.put("rotation", s.rotation)
+            obj.put("displayName", s.displayName)
+            obj.put("category", s.category)
+            servicesArray.put(obj)
+        }
+        backupObj.put("services", servicesArray)
+        return backupObj.toString()
     }
 }

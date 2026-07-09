@@ -134,15 +134,28 @@ fun RevealPinScreen(
                                     errorMessage = "Unable to launch biometric prompt"
                                     return@Button
                                 }
-                                BiometricAuthenticator.authenticate(activity) { result ->
+
+                                val decryptionCipher = BiometricAuthenticator.getDecryptionCipher(context)
+                                if (decryptionCipher == null) {
+                                    errorMessage = "Biometric storage key not initialized."
+                                    return@Button
+                                }
+
+                                BiometricAuthenticator.authenticate(activity, cryptoCipher = decryptionCipher) { result ->
                                     when (result) {
                                         is BiometricAuthenticator.Result.Success -> {
-                                            val storedPassphrase =
-                                                VaultsStorage.loadEncryptedPassphrase(context) ?: ""
-                                            val storedSalt =
-                                                VaultsStorage.loadSalt(context) ?: byteArrayOf()
-                                            val masterKey =
-                                                ffiDeriveMasterKey(storedPassphrase, storedSalt)
+                                            val authCipher = result.authenticatedCipher
+                                            val storedPassphrase = if (authCipher != null) {
+                                                BiometricAuthenticator.decryptPassphrase(context, authCipher) ?: ""
+                                            } else ""
+
+                                            if (storedPassphrase.isEmpty()) {
+                                                errorMessage = "Failed to unlock storage hardware securely."
+                                                return@authenticate
+                                            }
+
+                                            val storedSalt = VaultsStorage.loadSalt(context) ?: byteArrayOf()
+                                            val masterKey = ffiDeriveMasterKey(storedPassphrase, storedSalt)
                                             val formattedContext =
                                                 "v1|${service.countryCode.lowercase()}|${service.name.lowercase()}|${service.identifier}|${service.pinLength}|${service.rotation}"
                                             derivedPin = ffiDerivePin(
@@ -153,11 +166,8 @@ fun RevealPinScreen(
                                             errorMessage = ""
                                         }
 
-                                        is BiometricAuthenticator.Result.Error -> errorMessage =
-                                            result.message
-
-                                        is BiometricAuthenticator.Result.Cancelled -> { /* no-op, let them retry */
-                                        }
+                                        is BiometricAuthenticator.Result.Error -> errorMessage = result.message
+                                        is BiometricAuthenticator.Result.Cancelled -> { /* no-op */ }
                                     }
                                 }
                             },

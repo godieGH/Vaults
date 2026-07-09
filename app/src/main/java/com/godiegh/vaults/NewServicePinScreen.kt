@@ -177,10 +177,26 @@ fun NewServicePinScreen(navController: NavController) {
                                     errorMessage = "Unable to launch biometric prompt"
                                     return@Button
                                 }
-                                BiometricAuthenticator.authenticate(activity) { result ->
+
+                                val decryptionCipher = BiometricAuthenticator.getDecryptionCipher(context)
+                                if (decryptionCipher == null) {
+                                    errorMessage = "Biometric storage key not initialized."
+                                    return@Button
+                                }
+
+                                BiometricAuthenticator.authenticate(activity, cryptoCipher = decryptionCipher) { result ->
                                     when (result) {
                                         is BiometricAuthenticator.Result.Success -> {
-                                            val storedPassphrase = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
+                                            val authCipher = result.authenticatedCipher
+                                            val storedPassphrase = if (authCipher != null) {
+                                                BiometricAuthenticator.decryptPassphrase(context, authCipher) ?: ""
+                                            } else ""
+
+                                            if (storedPassphrase.isEmpty()) {
+                                                errorMessage = "Failed to unlock storage hardware securely."
+                                                return@authenticate
+                                            }
+
                                             derivePin(storedPassphrase)
                                             errorMessage = ""
                                         }

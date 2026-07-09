@@ -260,30 +260,9 @@ fun BackupSaltScreen(
                         } else if (backupPassword != confirmPassword) {
                             localErrorMessage = "Passwords do not match"
                         } else {
-                            val backupObj = JSONObject()
-                            backupObj.put("version", 1)
-                            backupObj.put("salt", VaultsStorage.loadSalt(context)?.joinToString("") { "%02x".format(it) } ?: "")
-                            backupObj.put("totp_secret", VaultsStorage.loadTotpSecret(context) ?: "")
-                            backupObj.put("passphrase_fingerprint", VaultsStorage.loadFingerprint(context) ?: "")
-                            backupObj.put("encrypted_passphrase", VaultsStorage.loadEncryptedPassphrase(context) ?: "")
-
-                            val services = VaultsStorage.loadServices(context)
-                            val servicesArray = JSONArray()
-                            services.forEach { s ->
-                                val obj = JSONObject()
-                                obj.put("id", s.id)
-                                obj.put("name", s.name)
-                                obj.put("countryCode", s.countryCode)
-                                obj.put("identifier", s.identifier)
-                                obj.put("pinLength", s.pinLength)
-                                obj.put("rotation", s.rotation)
-                                obj.put("displayName", s.displayName)
-                                obj.put("category", s.category)
-                                servicesArray.put(obj)
-                            }
-                            backupObj.put("services", servicesArray)
-
-                            encryptedBackupPayload = encryptBackup(backupObj.toString(), backupPassword)
+                            // Old manual array building replaced with:
+                            val backupPayload = VaultsStorage.exportVaultAsJson(context)
+                            encryptedBackupPayload = encryptBackup(backupPayload, backupPassword)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()

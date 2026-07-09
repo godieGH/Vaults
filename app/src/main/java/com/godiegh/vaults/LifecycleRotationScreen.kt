@@ -398,8 +398,13 @@ fun LifecycleRotationScreen(navController: NavController) {
                                 val isExpanded = expandedStates[index]
 
                                 val contextStr = "v1|${service.countryCode.lowercase()}|${service.name.lowercase()}|${service.identifier}|${service.pinLength}|${service.rotation}"
-                                val currentPin = remember(oldMasterKey) { if (oldMasterKey.isNotEmpty()) ffiDerivePin(oldMasterKey, contextStr, service.pinLength.toUInt()) else "" }
-                                val targetPin = remember(newMasterKey) { if (newMasterKey.isNotEmpty()) ffiDerivePin(newMasterKey, contextStr, service.pinLength.toUInt()) else "" }
+
+                                val currentPin = remember(oldMasterKey, contextStr) {
+                                    if (oldMasterKey.isNotEmpty()) ffiDerivePin(oldMasterKey, contextStr, service.pinLength.toUInt()) else ""
+                                }
+                                val targetPin = remember(newMasterKey, contextStr) {
+                                    if (newMasterKey.isNotEmpty()) ffiDerivePin(newMasterKey, contextStr, service.pinLength.toUInt()) else ""
+                                }
 
                                 ServiceRotationNode(
                                     index = index + 1,

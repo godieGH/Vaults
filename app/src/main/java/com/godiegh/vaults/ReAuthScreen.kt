@@ -20,7 +20,6 @@ import uniffi.vaults.ffiVerifyTotp
 
 @Composable
 fun ReAuthScreen(
-    passphrase: String,
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -72,9 +71,8 @@ fun ReAuthScreen(
                         onClick = {
                             val storedSecret = VaultsStorage.loadTotpSecret(context) ?: ""
                             if (ffiVerifyTotp(storedSecret, totpCode)) {
-                                val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
-                                navController.navigate("2fa_setup/$encoded") {
-                                    popUpTo("reauth_for_2fa/{passphrase}") { inclusive = true }
+                                navController.navigate("2fa_setup") {
+                                    popUpTo("reauth_for_2fa") { inclusive = true }
                                 }
                             } else {
                                 errorMessage = "Invalid code. Try again."
@@ -112,9 +110,8 @@ fun ReAuthScreen(
                             BiometricAuthenticator.authenticate(activity) { result ->
                                 when (result) {
                                     is BiometricAuthenticator.Result.Success -> {
-                                        val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
-                                        navController.navigate("2fa_setup/$encoded") {
-                                            popUpTo("reauth_for_2fa/{passphrase}") { inclusive = true }
+                                        navController.navigate("2fa_setup") {
+                                            popUpTo("reauth_for_2fa") { inclusive = true }
                                         }
                                     }
                                     is BiometricAuthenticator.Result.Error -> errorMessage = result.message
@@ -156,9 +153,8 @@ fun ReAuthScreen(
                             val inputFingerprint = uniffi.vaults.ffiDerivePassphraseFingerprint(confirmPassphrase, storedSalt)
 
                             if (storedFingerprint != null && inputFingerprint == storedFingerprint) {
-                                val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
-                                navController.navigate("2fa_setup/$encoded") {
-                                    popUpTo("reauth_for_2fa/{passphrase}") { inclusive = true }
+                                navController.navigate("2fa_setup") {
+                                    popUpTo("reauth_for_2fa") { inclusive = true }
                                 }
                             } else {
                                 errorMessage = "Incorrect passphrase."

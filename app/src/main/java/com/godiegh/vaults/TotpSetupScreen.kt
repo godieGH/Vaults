@@ -32,11 +32,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * No longer takes the secret as a parameter — it's read straight from
+ * VaultsStorage instead of being passed through the nav route, where it would
+ * otherwise sit in the back stack in plaintext (same class of leak the
+ * passphrase had).
+ */
 @Composable
-fun TotpSetupScreen(secret: String, navController: NavController) {
+fun TotpSetupScreen(navController: NavController) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val coroutineScope = rememberCoroutineScope()
+
+    val secret = remember { VaultsStorage.loadTotpSecret(context) }
+
+    if (secret.isNullOrEmpty()) {
+        LaunchedEffect(Unit) { navController.popBackStack() }
+        return
+    }
 
     // 1. Format the URI for Authenticator apps
     val issuer = "Vaults"
@@ -160,7 +173,7 @@ fun TotpSetupScreen(secret: String, navController: NavController) {
                 onClick = {
                     VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_COMPLETED)
                     navController.navigate("main") {
-                        popUpTo("totp_setup/$secret") { inclusive = true }
+                        popUpTo("totp_setup") { inclusive = true }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),

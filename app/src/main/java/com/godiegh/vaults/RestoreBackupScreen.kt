@@ -343,11 +343,9 @@ fun RestoreBackupScreen(
                                 }
                                 VaultsStorage.saveServices(context, services)
 
-                                val pass = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
-                                val encoded = java.net.URLEncoder.encode(pass, "UTF-8")
                                 VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_2FA_SETUP)
 
-                                navController.navigate("2fa_setup/$encoded") {
+                                navController.navigate("2fa_setup") {
                                     popUpTo("restore_backup") { inclusive = true }
                                 }
                             } else {

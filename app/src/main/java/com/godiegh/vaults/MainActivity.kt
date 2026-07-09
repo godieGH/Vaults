@@ -11,10 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,18 +66,14 @@ class MainActivity : FragmentActivity() {
             VaultsTheme {
                 val navController = rememberNavController()
                 val context = LocalContext.current
-                
+
                 val startDestination = remember {
                     val step = VaultsStorage.loadSetupStep(context)
                     val onboarded = VaultsStorage.isOnboarded(context)
-                    
+
                     if (onboarded) {
                         when (step) {
-                            VaultsStorage.STEP_2FA_SETUP -> {
-                                val pass = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
-                                val encoded = java.net.URLEncoder.encode(pass, "UTF-8")
-                                "2fa_setup/$encoded"
-                            }
+                            VaultsStorage.STEP_2FA_SETUP -> "2fa_setup"
                             VaultsStorage.STEP_COMPLETED -> "main"
                             else -> "main"
                         }
@@ -100,9 +92,8 @@ class MainActivity : FragmentActivity() {
                     }
 
                     // 2. Initial Setup Verification Target
-                    composable(route = "totp_setup/{secret}") { backStackEntry ->
-                        val secret = backStackEntry.arguments?.getString("secret") ?: ""
-                        TotpSetupScreen(secret = secret, navController = navController)
+                    composable(route = "totp_setup") {
+                        TotpSetupScreen(navController = navController)
                     }
 
                     // 3. Home Screen (Replaces the old placeholder "main" screen)
@@ -110,16 +101,12 @@ class MainActivity : FragmentActivity() {
                         HomeScreen(navController = navController)
                     }
 
-                    composable(route = "2fa_setup/{passphrase}") { backStackEntry ->
-                        val raw = backStackEntry.arguments?.getString("passphrase") ?: ""
-                        val passphrase = java.net.URLDecoder.decode(raw, "UTF-8")
-                        TwoFactorSetupScreen(passphrase = passphrase, navController = navController)
+                    composable(route = "2fa_setup") {
+                        TwoFactorSetupScreen(navController = navController)
                     }
 
-                    composable(route = "reauth_for_2fa/{passphrase}") { backStackEntry ->
-                        val raw = backStackEntry.arguments?.getString("passphrase") ?: ""
-                        val passphrase = java.net.URLDecoder.decode(raw, "UTF-8")
-                        ReAuthScreen(passphrase = passphrase, navController = navController)
+                    composable(route = "reauth_for_2fa") {
+                        ReAuthScreen(navController = navController)
                     }
                     // 4. Add Service Link Configuration Page
                     composable(route = "add_service") {
@@ -532,11 +519,11 @@ fun OnboardingScreen(navController: NavController, modifier: Modifier = Modifier
 
                                     VaultsStorage.saveSalt(context, salt)
                                     VaultsStorage.saveTotpSecret(context, totpSecret)
+                                    VaultsStorage.saveEncryptedPassphrase(context, passphrase)
 
                                     VaultsStorage.saveSetupStep(context, VaultsStorage.STEP_2FA_SETUP)
 
-                                    val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
-                                    navController.navigate("2fa_setup/$encoded") {
+                                    navController.navigate("2fa_setup") {
                                         popUpTo("onboarding") { inclusive = true }
                                     }
                                 }

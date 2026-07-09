@@ -195,10 +195,7 @@ fun SettingsScreen(navController: NavController) {
             // Inside SettingsScreen.kt
             item {
                 SettingsItemRow(label = "Change 2FA Method") {
-                    val passphrase = VaultsStorage.loadEncryptedPassphrase(context) ?: ""
-                    val encoded = java.net.URLEncoder.encode(passphrase, "UTF-8")
-
-                    navController.navigate("reauth_for_2fa/$encoded")
+                    navController.navigate("reauth_for_2fa")
                 }
             }
 
