@@ -356,7 +356,9 @@
         "td",
         "cd",
         "cg",
-        "ga"
+        "ga",
+        "sl",
+        "mw"
       ]
     },
     {
@@ -376,7 +378,9 @@
         "lr",
         "gn",
         "sl",
-        "ng"
+        "ng",
+        "za",
+        "bw"
       ]
     },
     {
@@ -392,7 +396,12 @@
         "cd",
         "gn",
         "cf",
-        "bf"
+        "bf",
+        "ma",
+        "eg",
+        "bw",
+        "sl",
+        "mg"
       ]
     },
     {
@@ -465,6 +474,152 @@
         "gm",
         "ml",
         "bf"
+      ]
+    },
+    {
+      "displayName": "Unitel Money",
+      "rustKey": "unitelmoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ao"
+      ]
+    },
+    {
+      "displayName": "Africash",
+      "rustKey": "africash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ao"
+      ]
+    },
+    {
+      "displayName": "MyZaka (Mascom)",
+      "rustKey": "myzaka",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "bw"
+      ]
+    },
+    {
+      "displayName": "Lumicash",
+      "rustKey": "lumicash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "bi"
+      ]
+    },
+    {
+      "displayName": "EcoCash",
+      "rustKey": "ecocash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "zw",
+        "bi"
+      ]
+    },
+    {
+      "displayName": "Vodafone Cash",
+      "rustKey": "vodafonecash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "eg"
+      ]
+    },
+    {
+      "displayName": "Etisalat Cash",
+      "rustKey": "etisalatcash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "eg"
+      ]
+    },
+    {
+      "displayName": "Telecel Cash",
+      "rustKey": "telecelcash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "gh"
+      ]
+    },
+    {
+      "displayName": "TNM Mpamba",
+      "rustKey": "tnmmpamba",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "mw"
+      ]
+    },
+    {
+      "displayName": "Inwi Money",
+      "rustKey": "inwimoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ma"
+      ]
+    },
+    {
+      "displayName": "Wafacash",
+      "rustKey": "wafacash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "ma"
+      ]
+    },
+    {
+      "displayName": "Free Money",
+      "rustKey": "freemoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "sn"
+      ]
+    },
+    {
+      "displayName": "Afrimoney",
+      "rustKey": "afrimoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "sl",
+        "gm"
+      ]
+    },
+    {
+      "displayName": "Vodapay",
+      "rustKey": "vodapay",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "za"
+      ]
+    },
+    {
+      "displayName": "T-Money",
+      "rustKey": "tmoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "tg"
+      ]
+    },
+    {
+      "displayName": "OneMoney",
+      "rustKey": "onemoney",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "zw"
+      ]
+    },
+    {
+      "displayName": "Telecash",
+      "rustKey": "telecash",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "zw"
+      ]
+    },
+    {
+      "displayName": "Zamtel Kwacha",
+      "rustKey": "zamtelkwacha",
+      "category": "MOBILE_MONEY",
+      "countries": [
+        "zm"
       ]
     },
     {
